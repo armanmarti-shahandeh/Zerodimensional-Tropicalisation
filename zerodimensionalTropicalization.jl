@@ -29,12 +29,12 @@ function partial_tropicalization_step(p::PartiallyTropicalizedPoint,PolyRing, nu
     triangularSystem = triangular_system(p)
     T = tropical_semiring()
     variable_list = gens(PolyRing)
-    Rt, d = polynomial_ring(T, length(triangularSystem)) ##This polynomial ring has to be explicitly defined for our subsequent homomorphisms into the below univariate ring##
+    Rt, d = polynomial_ring(T, ngens(PolyRing)) ##This polynomial ring has to be explicitly defined for our subsequent homomorphisms into the below univariate ring##
     R, active = polynomial_ring(T, ["z"]) ##A univariate tropical polynomial ring to act as the vessel for all hypersurface vertex calculations##
     active = active[1]
-    mapping_list = zeros(R, length(triangularSystem)) ##The list for the given homomorphism mapping##
+    mapping_list = zeros(R, ngens(PolyRing)) ##The list for the given homomorphism mapping##
     index = length(partialPoint)+1
-    winit = Rational{Int}.(vcat([partialPoint[j] for j in 1:index-1], zeros(QQ, length(triangularSystem)-index+1)))
+    winit = Rational{Int}.(vcat([partialPoint[j] for j in 1:index-1], zeros(QQ, ngens(PolyRing)-index+1)))
     if index==1 ##The initial step of the algorithm##
         mapping_list[1] = active
         phi = hom(Rt, R, c->c, mapping_list)
@@ -83,3 +83,4 @@ nu = tropical_semiring_map(K, t)
 R,(x1,x2,x3) = K["x1","x2","x3"]
 triangular = [t*x1^2+x1+1, t*x2^2+x1*x2+1, x3+x1*x2]
 zerodimensional_tropicalization(triangular, R, nu)
+#Example runtime on M1 Macbook Air (uncompiled - rough): 4.45s
