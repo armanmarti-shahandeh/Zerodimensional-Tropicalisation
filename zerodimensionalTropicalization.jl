@@ -23,31 +23,26 @@ function triangular_system(p::PartiallyTropicalizedPoint)
     return p.triangularSystem
 end
 
-function partial_tropicalization_step(p::PartiallyTropicalizedPoint,PolyRing, nu) 
+function partial_tropicalization_step(p::PartiallyTropicalizedPoint, nu)
     next_iteration_points = [] ##This will return the list of all branching partially-tropicalised points emanating from this iteration step##
     partialPoint = partial_point(p)
     triangularSystem = triangular_system(p)
     T = tropical_semiring()
-    variable_list = gens(PolyRing)
-    Rt, d = polynomial_ring(T, ngens(PolyRing)) ##This polynomial ring has to be explicitly defined for our subsequent homomorphisms into the below univariate ring##
+    variable_list = gens(parent(first(triangularSystem)))
+    n = length(variable_list)
+    Rt,_ = polynomial_ring(T, n) ##This polynomial ring has to be explicitly defined for our subsequent homomorphisms into the below univariate ring##
     R, active = polynomial_ring(T, ["z"]) ##A univariate tropical polynomial ring to act as the vessel for all hypersurface vertex calculations##
     active = active[1]
-    mapping_list = zeros(R, ngens(PolyRing)) ##The list for the given homomorphism mapping##
+    mapping_list = zeros(R, n) ##The list for the given homomorphism mapping##
     index = length(partialPoint)+1
-    winit = Rational{Int}.(vcat([partialPoint[j] for j in 1:index-1], zeros(QQ, ngens(PolyRing)-index+1)))
-    if index==1 ##The initial step of the algorithm##
-        mapping_list[1] = active
-        phi = hom(Rt, R, c->c, mapping_list)
-        for verts in vertices(tropical_hypersurface(phi(tropical_polynomial(triangularSystem[1], nu))))
-            push!(next_iteration_points, PartiallyTropicalizedPoint([verts[1]], triangularSystem))
-        end
-    elseif all([is_monomial(initial(coeff(triangularSystem[index], [variable_list[index]], [j]), nu, winit)) for j in 1:degree(triangularSystem[index], variable_list[index])])
-        for j in 1:index-1
-            mapping_list[j] = R(partialPoint[j])##This is setting up the substitution map to be used in the homomorphism##
-        end
+    winit = Rational{Int}.(vcat([partialPoint[j] for j in 1:index-1], zeros(QQ, n-index+1)))
+    g = triangularSystem[index]
+
+    if all([is_monomial(initial(coeff(g, [variable_list[index]], [j]), nu, winit)) for j in 1:degree(g, variable_list[index])])
+        mapping_list[1:index-1] = R.(partialPoint[1:index-1])##This is setting up the substitution map to be used in the homomorphism##
         mapping_list[index] = active
         phi = hom(Rt, R, c->c, mapping_list)
-        for verts in vertices(tropical_hypersurface(phi(tropical_polynomial(triangularSystem[index], nu))))
+        for verts in vertices(tropical_hypersurface(phi(tropical_polynomial(g, nu))))
             new_partialPoint = copy(partialPoint)
             push!(new_partialPoint, verts[1])
             push!(next_iteration_points, PartiallyTropicalizedPoint(new_partialPoint, triangularSystem))
@@ -69,7 +64,7 @@ function zerodimensional_tropicalization(triangularSystem::Vector, PolyRing, nu)
     while !all(is_fully_determined, determination_list)
         copy_determination_list = []
         for part_point in determination_list
-            for new_pts in partial_tropicalization_step(part_point, PolyRing, nu) 
+            for new_pts in partial_tropicalization_step(part_point, PolyRing, nu)
                 push!(copy_determination_list, new_pts)
             end
         end
