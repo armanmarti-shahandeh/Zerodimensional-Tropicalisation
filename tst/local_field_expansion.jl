@@ -1,11 +1,12 @@
-include("../src/zerodimensional_tropicalization.jl")
+using Oscar
+include("../internal_local_field_expansion.jl")
 
 Kt, t = puiseux_series_field(QQ, 100, "t")
 U,(u1,u2,u3,u4) = Kt["u1","u2","u3","u4"]
 R,(x1,x2,x3,x4) = U["x1","x2","x3","x4"]
 
 r1 = 1+t+t^2+t^3+u1*t^5
-r2 = 1+t+t^2 
+r2 = 1+t+t^2
 f = (x1-r1)*(x1-r2)
 local_field_expansion(f, QQ(0), QQ(4))
 
