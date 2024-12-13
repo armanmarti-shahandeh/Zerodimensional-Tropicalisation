@@ -13,7 +13,7 @@ function partial_tropicalization_step(partialPoint::Vector{QQFieldElem}, nu::Tro
     winit = Rational{Int}.(vcat(partialPoint[1:index-1], zeros(QQ, n-index+1)))
     g = triangularSystem[index]
     if all([is_monomial(initial(coeff(g, [variable_list[index]], [j]), nu, winit)) for j in 1:degree(g, variable_list[index])])
-        mapping_list[1:index-1] = R.(partialPoint[1:index-1])#This is setting up the substitution map to be used in the homomorphism
+        mapping_list[1:index-1] = R.(partialPoint[1:index-1]) #This is setting up the substitution map to be used in the homomorphism
         mapping_list[index] = active
         phi = hom(Rt, R, c->c, mapping_list)
         for verts in vertices(tropical_hypersurface(phi(tropical_polynomial(g, nu))))

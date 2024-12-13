@@ -21,3 +21,13 @@ K = base_ring(R)
 
 include("tropical_variety_triangular.jl")
 tropical_variety_triangular(triangular,nu,100)
+
+
+R,_ = polynomial_ring(QQ,"x"=>1:3)
+variableNames = symbols(R)
+S,x,y = polynomial_ring(QQ,variableNames,"y"=>1:3)
+
+
+I = ideal(gens(R))
+phi = hom(R,S,c->1,y)
+phi(I)

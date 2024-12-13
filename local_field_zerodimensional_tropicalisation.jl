@@ -6,8 +6,8 @@ function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebr
     KtX = parent(last(triangularSystem))
     Kt = base_ring(KtX)
     n = length(gens(KtX))
-    Su, u = polynomial_ring(Kt, ["u$i" for i in 1:n-1])
-    Rx, x = polynomial_ring(Su, [repr(gens(KtX)[i]) for i in 1:n])
+    Su, u = polynomial_ring(Kt, ["u$i" for i in 1:n])
+    Rx, x = polynomial_ring(Su, symbols(KtX))
     convertedTriangularSystem = AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}[]
     for poly in triangularSystem
         newPoly = zero(Rx)
@@ -45,55 +45,79 @@ function propogate_local_field_expansion(partialTriangularSystem::Vector{<:Abstr
     return tupledBranchesOfRoots
 end
 
-function zero_dimensional_triangular_tropicalization(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, maxPrecision::QQFieldElem, precisionStep::QQFieldElem=1)
+function working_leaves(G::Graph, maxDepth::Int)
+    leaves = [i for i in 1:n_vertices(G) if degree(G, i)==1]
+    depths = [length(shortest_path_dijkstra(rootConnections, 1 , i))-1 for i in leaves]
+    return [i for (i,l) in zip(leaves, depths) if l<maxDepth]
+end
+
+function pick_working_leaf(G::Graph, maxDepth::Int)
+    leaves = [i for i in 1:n_vertices(G) if degree(G, i)<=1]
+    depths = [length(shortest_path_dijkstra(G, 1 , i))-1 for i in leaves]
+    workingLeaves = [i for (i,l) in zip(leaves, depths) if l<maxDepth]
+    if isempty(workingLeaves)
+        return -1
+    end
+    return first(workingLeaves)
+end
+
+function zero_dimensional_triangular_tropicalization(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, maxPrecision::QQFieldElem, precisionStep::QQFieldElem=QQ(1))
     triangularSystem = imprecision_tracker_injection(triangularSystem)
     Rx = parent(last(triangularSystem))
     Su = base_ring(Rx)
     Kt = base_ring(Su)
+    t = gen(Kt)
     rootConnections = Graph{Undirected}(1)
     roots = Tuple{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, QQFieldElem}[] #This will store ALL the roots that we refer to within the tree, as well as the last used 'propogation' precision. i.e. the precision of the univariate approximation that was then used to calculate further terms in the expansion
-    liveComputations = Vector{Int64}[1]
-    while !isempty(liveComputations)
-        newLiveComputations = Vector{Int64}[]
-        for rootAssess in liveComputations
-            associatedBranch = shortest_path_dijkstra(rootConnections, 1 , rootAssess)
-            deleteat!(associatedBranch, 1)
-            if length(associatedBranch) == length(triangularSystem)
-                continue
-            end
-            associatedBranchRoots = [roots[i-1] for i in associatedBranch]
-            workingDepth = length(associatedBranchRoots)+1
-            workingPoly = evaluate(triangularSystem[workingDepth], [vcat([root[1] for root in associatedBranchRoots], gens(Rx)[workingDepth], zeros(Rx, length(triangularSystem)-workingDepth))])
-            while !is_extended_newton_polyhedron_well_defined(workingPoly)
-                partialTriangularSystem = [triangularSystem[i] for i in 1:workingDepth-1]
-                propogatedPrecision = first(associatedBranchRoots)[2]+precisionStep
-                if propogatedPrecision > maxPrecision
-                    println("The input maximum precision has been reached, and the tropicalization is still not well-defined")
-                    break
-                end
-                newBranchesOfRoots = propogate_local_field_expansion(partialTriangularSystem, associatedBranchRoots, propogatedPrecision, maxPrecision)
-                for updatedBranch in newBranchesOfRoots
-                    if updatedBranch == first(newBranchesOfRoots)
-                        for (e, i) in enumerate(associatedBranch) 
-                            roots[i-1] = updatedBranch[e]
-                        end
-                    else
-                        splittingPoint = findfirst([updatedBranch[i] != first(newBranchesOfRoots)[i] for i in 1:length(updatedBranch)])
-                        splittingPointIndex = associatedBranch[splittingPoint]
-                        numVertex = n_vertices(rootConnections)
-                        add_vertices!(rootConnections, length(updatedBranch)-splittingPoint+1)
-                        add_edge!(rootConnections, splittingPointIndex, numVertex+1)
-                        for i in 1:length(updatedBranch)-splittingPointIndex
-                            add_edge!(rootConnections, numVertex+i, numVertex+i+1)
-                        end
-                        for i in splittingPoint:length(updatedBranch)
-                            push!(roots, updatedBranch[i])
-                        end
-                        push!(newLiveComputations, numVertex+length(updatedBranch)-splittingPoint+1)
+    rootAssess = pick_working_leaf(rootConnections, length(triangularSystem))
+    println("rootAssess: ", rootAssess)
+    while rootAssess>0
+        println("rootAssess: ", rootAssess)
+        associatedBranch = shortest_path_dijkstra(rootConnections, 1 , rootAssess)
+        deleteat!(associatedBranch, 1)
+        associatedBranchRoots = [roots[i-1] for i in associatedBranch]
+        workingDepth = length(associatedBranchRoots)+1
+        workingPoly = evaluate(triangularSystem[workingDepth], Vector{elem_type(Rx)}(vcat([root[1] for root in associatedBranchRoots], gens(Rx)[workingDepth], zeros(Rx, length(triangularSystem)-workingDepth))))
+        while !is_extended_newton_polyhedron_well_defined(workingPoly)
+            partialTriangularSystem = [triangularSystem[i] for i in 1:workingDepth-1]
+            propogatedPrecision = first(associatedBranchRoots)[2]+precisionStep
+            if propogatedPrecision > maxPrecision
+                println("The input maximum precision has been reached, and the tropicalization is still not well-defined")
+                break
+             end
+            newBranchesOfRoots = propogate_local_field_expansion(partialTriangularSystem, associatedBranchRoots, propogatedPrecision, maxPrecision)
+            for updatedBranch in newBranchesOfRoots
+                if updatedBranch == first(newBranchesOfRoots)
+                    for (e, i) in enumerate(associatedBranch)
+                        roots[i-1] = updatedBranch[e]
+                    end
+                else
+                    splittingPoint = findfirst([updatedBranch[i] != first(newBranchesOfRoots)[i] for i in 1:length(updatedBranch)])
+                    splittingPointIndex = associatedBranch[splittingPoint]
+                    numVertex = n_vertices(rootConnections)
+                    add_vertices!(rootConnections, length(updatedBranch)-splittingPoint+1)
+                    add_edge!(rootConnections, splittingPointIndex, numVertex+1)
+                    for i in 1:length(updatedBranch)-splittingPointIndex
+                        add_edge!(rootConnections, numVertex+i, numVertex+i+1)
+                    end
+                    for i in splittingPoint:length(updatedBranch)
+                        push!(roots, updatedBranch[i])
                     end
                 end
-                workingPoly = evaluate(triangularSystem[workingDepth], [vcat([root[1] for root in first(newBranchesOfRoots)], gens(Rx)[workingDepth], zeros(Rx, length(triangularSystem)-workingDepth))])
             end
+            workingPoly = evaluate(triangularSystem[workingDepth], Vector{elem_type(Rx)}(vcat([root[1] for root in first(newBranchesOfRoots)], gens(Rx)[workingDepth], zeros(Rx, length(triangularSystem)-workingDepth))))
+            associatedBranchRoots = first(newBranchesOfRoots)
         end
+
+        println("workingPoly: ", workingPoly)
+        pushfirst!(associatedBranch, 1)
+        for v in vertices(tropical_hypersurface(trop_univariate_conversion(tropical_polynomial(workingPoly))))
+            push!(roots, (Rx(gens(Su)[workingDepth])*t^Rational{Int64}(v[1]), zero(QQ)))  # TODO: fix the necessity of Rational{Int64} here
+            add_vertex!(rootConnections)
+            println("associatedBranch", associatedBranch)
+            add_edge!(rootConnections, last(associatedBranch), n_vertices(rootConnections))
+        end
+        rootAssess = pick_working_leaf(rootConnections, length(triangularSystem))
     end
+    return roots
 end
