@@ -65,30 +65,47 @@ function pick_working_leaf(G::Graph, maxDepth::Int)
 end
 
 function zero_dimensional_triangular_tropicalization(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, maxPrecision::QQFieldElem, precisionStep::QQFieldElem=QQ(1))
+    ###
+    # Preprocess triangularSystem
+    ###
     triangularSystem = imprecision_tracker_injection(triangularSystem)
     Rx = parent(last(triangularSystem))
-    Su = base_ring(Rx)
-    Kt = base_ring(Su)
-    t = gen(Kt)
+    n = ngens(Rx)
+    x = gens(Rx)      # x_1, ..., x_n - the original variables of the input polynomial system
+    R = base_ring(Rx)
+    u = gens(R)       # u_1, ..., u_n - representing the uncertainties
+    Kt = base_ring(R)
+    t = gen(Kt)       # Puiseux variable
+
+    ###
+    # Initialize rootsTree and roots
+    ###
     rootsTree = Graph{Undirected}(1)
-    roots = Tuple{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, QQFieldElem}[] #This will store ALL the roots that we refer to within the tree, as well as the last used 'propogation' precision. i.e. the precision of the univariate approximation that was then used to calculate further terms in the expansion
+    roots = Tuple{elem_type(R), QQFieldElem}[(zero(R),maxPrecision)]
+
+    ###
+    # Main loop
+    ###
     workingLeaf = pick_working_leaf(rootsTree, length(triangularSystem))
     println("workingLeaf: ", workingLeaf)
     while workingLeaf>0
+        # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
         println("workingLeaf: ", workingLeaf)
         workingBranch = shortest_path_dijkstra(rootsTree, 1 , workingLeaf)
-        deleteat!(workingBranch, 1)
-        workingBranchRoots = [roots[i-1] for i in workingBranch]
-        workingDepth = length(workingBranchRoots)+1
-        workingPoly = evaluate(triangularSystem[workingDepth], Vector{elem_type(Rx)}(vcat([root[1] for root in workingBranchRoots], gens(Rx)[workingDepth], zeros(Rx, length(triangularSystem)-workingDepth))))
-        while !is_extended_newton_polyhedron_well_defined(workingPoly)
-            partialTriangularSystem = [triangularSystem[i] for i in 1:workingDepth-1]
+        deleteat!(workingBranch, 1) # remove artificial root for easier handling
+        zTilde = first.(roots[workingBranch])
+        i = length(zTilde)+1
+        fTilde = evaluate(triangularSystem[i], vcat(Rx.(zTilde),x[i],zeros(Rx,n-i)))
+
+        # Improve the precision of the zTilde
+        # until the extended Newton polyhedron of fTilde is well defined
+        while !is_extended_newton_polyhedron_well_defined(fTilde)
+            # TODO: test code below
             propagatedPrecision = first(workingBranchRoots)[2]+precisionStep
-            if propagatedPrecision > maxPrecision
-                println("The input maximum precision has been reached, and the tropicalization is still not well-defined")
-                break
-             end
-            newBranchesOfRoots = propagate_local_field_expansion(partialTriangularSystem, workingBranchRoots, propagatedPrecision, maxPrecision)
+
+            @req propagatedPrecision<maxPrecision "maximum precision insufficient"
+
+            newBranchesOfRoots = propagate_local_field_expansion(triangularSystem[1:i-1], zTilde, propagatedPrecision, maxPrecision)
             for updatedBranch in newBranchesOfRoots
                 if updatedBranch == first(newBranchesOfRoots)
                     for (e, i) in enumerate(workingBranch)
@@ -108,18 +125,20 @@ function zero_dimensional_triangular_tropicalization(triangularSystem::Vector{<:
                     end
                 end
             end
-            workingPoly = evaluate(triangularSystem[workingDepth], Vector{elem_type(Rx)}(vcat([root[1] for root in first(newBranchesOfRoots)], gens(Rx)[workingDepth], zeros(Rx, length(triangularSystem)-workingDepth))))
+            fTilde = evaluate(triangularSystem[i], Vector{elem_type(Rx)}(vcat([root[1] for root in first(newBranchesOfRoots)], x[i], zeros(Rx, length(triangularSystem)-i))))
             workingBranchRoots = first(newBranchesOfRoots)
         end
 
-        println("workingPoly: ", workingPoly)
-        pushfirst!(workingBranch, 1)
-        for v in vertices(tropical_hypersurface(trop_univariate_conversion(tropical_polynomial(workingPoly))))
-            push!(roots, (Rx(gens(Su)[workingDepth])*t^Rational{Int64}(v[1]), zero(QQ)))  # TODO: fix the necessity of Rational{Int64} here
+        # Compute Trop(fTilde) =: {v_1, ..., v_k} and add u_i*t^v_j to roots for each v_j
+        println("fTilde: ", fTilde)
+        pushfirst!(workingBranch, 1) # add artificial root, otherwise code below fails
+        for v in vertices(tropical_hypersurface(trop_univariate_conversion(tropical_polynomial(fTilde))))
+            push!(roots, (u[i]*t^Rational{Int64}(v[1]), zero(QQ)))
             add_vertex!(rootsTree)
-            println("workingBranch", workingBranch)
             add_edge!(rootsTree, last(workingBranch), n_vertices(rootsTree))
         end
+
+        # Pick new workingLeaf
         workingLeaf = pick_working_leaf(rootsTree, length(triangularSystem))
     end
     return roots
