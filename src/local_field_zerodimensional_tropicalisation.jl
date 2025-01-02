@@ -1,5 +1,5 @@
 # Input: triangular polynomial system in K[x_1,...,x_n] where K is a Puiseux series field
-# Output: same triangular polynomial system in R[x_1,...,x_n] where K[u_1,...,u_n],
+# Output: same triangular polynomial system in R[x_1,...,x_n] where R = K[u_1,...,u_n],
 #   u_i represents the uncertainty arising from solving f_i in x_i
 # TODO: input should be over the rational function field
 function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
@@ -12,11 +12,27 @@ function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebr
 end
 
 
+# Input: element of R = K[u_1,...,u_n]
+# Output: minimum of coefficient valuations over all non-constant monomials
+function precision(c::AbstractAlgebra.Generic.PuiseuxSeriesFieldElem, maxPrecision::QQFieldElem)
+    cPrecision = maxPrecision
+    for (ci,ui) in zip(coefficients(c),monomials(c))
+        if total_degree(ui)>0
+            cPrecision = min(cPrecision,valuation(ci))
+        end
+    end
+    return cPrecision
+end
+
 # Input:
 # Output:
-# TODO: I think there is a problem here, why is desiredPropagation not used in the call of local_field_expansion?
-function propagate_local_field_expansion(partialTriangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}}, branchOfRoots::Vector{<:Tuple{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, QQFieldElem}}, desiredPropagation::QQFieldElem, maxPrecision::QQFieldElem)
-    startingPoint = findfirst(!isequal(desiredPropagation), [root[2] for root in branchOfRoots])
+# TODO: I think there is a problem here, why is workingPrecision not used in the call of local_field_expansion?
+function propagate_local_field_expansion(partialTriangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}},
+                                         branchOfRoots::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}},
+                                         workingPrecision::QQFieldElem,
+                                         maxPrecision::QQFieldElem)
+
+    startingPoint = findfirst(!isequal(workingPrecision), [root[2] for root in branchOfRoots])
     branchesOfRoots = [[branchOfRoots[i][1] for i in 1:startingPoint-1]]
     while length(first(branchesOfRoots))!=length(branchOfRoots)
         newBranchesOfRoots = []
@@ -32,7 +48,7 @@ function propagate_local_field_expansion(partialTriangularSystem::Vector{<:Abstr
     end
     tupledBranchesOfRoots = []
     for branchOfRoot in branchesOfRoots
-        push!(tupledBranchesOfRoots, [(root, desiredPropagation) for root in branchOfRoot])
+        push!(tupledBranchesOfRoots, [(root, workingPrecision) for root in branchOfRoot])
     end
     return tupledBranchesOfRoots
 end
@@ -47,7 +63,6 @@ function working_leaves(G::Graph, maxDepth::Int)
     depths = [length(shortest_path_dijkstra(rootConnections, 1 , i))-1 for i in leaves]
     return [i for (i,l) in zip(leaves, depths) if l<maxDepth]
 end
-
 
 # Input:
 #   - G, the rootsTree with vertex 1 as root
@@ -78,32 +93,61 @@ function zero_dimensional_triangular_tropicalization(triangularSystem::Vector{<:
     t = gen(Kt)       # Puiseux variable
 
     ###
-    # Initialize rootsTree and roots
+    # Initialize book-keeping data
+    # - roots: the (approximate) roots of the fTildes
+    # - rootsPrecision:
+    #   . for ~z1: the precision to which ~z1 is computed
+    #   . for ~z2,...,~zn: the precision of ~z1 used in the computation of the root
+    # - rootsTree: the tree of the roots
     ###
+    roots = zeros(R,1)
+    rootsPrecision= [maxPrecision]
     rootsTree = Graph{Undirected}(1)
-    roots = Tuple{elem_type(R), QQFieldElem}[(zero(R),maxPrecision)]
 
     ###
     # Main loop
     ###
-    workingLeaf = pick_working_leaf(rootsTree, length(triangularSystem))
-    println("workingLeaf: ", workingLeaf)
-    while workingLeaf>0
-        # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
+    while true
+        # Pick a working leaf and abort loop if none exist
+        workingLeaf = pick_working_leaf(rootsTree, length(triangularSystem))
         println("workingLeaf: ", workingLeaf)
+        if workingLeaf<0
+            break
+        end
+
+        # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
         workingBranch = shortest_path_dijkstra(rootsTree, 1 , workingLeaf)
         deleteat!(workingBranch, 1) # remove artificial root for easier handling
-        zTilde = first.(roots[workingBranch])
+        zTilde = roots[workingBranch]
         i = length(zTilde)+1
         fTilde = evaluate(triangularSystem[i], vcat(Rx.(zTilde),x[i],zeros(Rx,n-i)))
+        println("fTilde: ", fTilde)
 
-        # Improve the precision of the zTilde
-        # until the extended Newton polyhedron of fTilde is well defined
-        while !is_extended_newton_polyhedron_well_defined(fTilde)
-            # TODO: test code below
-            propagatedPrecision = first(workingBranchRoots)[2]+precisionStep
+        if is_extended_newton_polyhedron_well_defined(fTilde)
+            # If the extended Newton polyhedron of fTilde is well defined, extend the branch
+            # by computing Trop(fTilde) =: {v_1, ..., v_k} and adding for each v_j
+            #  - u_i*t^v_j to roots,
+            #  - NegInf to rootsPrecision
+            #  - an edge to rootsTree
+            pushfirst!(workingBranch, 1) # add artificial root, otherwise code below fails
+            TropH = tropical_hypersurface(trop_univariate_conversion(tropical_polynomial(fTilde)))
+            for v in vertices(TropH)
+                push!(roots, u[i]*t^Rational{Int64}(v[1]))
+                push!(rootsPrecision, -13371337) # TODO: use NegInf
+                add_vertex!(rootsTree)
+                add_edge!(rootsTree, last(workingBranch), n_vertices(rootsTree))
+            end
+        else
+            # If the extended Newton polyhedron of fTilde is not well defined, update the branch.
 
-            @req propagatedPrecision<maxPrecision "maximum precision insufficient"
+            # If current ~z_1 precision is precision used for computing ~z_2,...,~z_{i-1}, increase it
+            workingPrecision = rootsPrecision[first(workingBranch)]
+            if workingPrecision==rootsPrecision[last(workingBranch)]
+                workingPrecision += precisionStep
+            end
+            @req workingPrecision<maxPrecision "maximum precision insufficient"
+
+            # TODO: overhaul code below
 
             newBranchesOfRoots = propagate_local_field_expansion(triangularSystem[1:i-1], zTilde, propagatedPrecision, maxPrecision)
             for updatedBranch in newBranchesOfRoots
@@ -125,21 +169,7 @@ function zero_dimensional_triangular_tropicalization(triangularSystem::Vector{<:
                     end
                 end
             end
-            fTilde = evaluate(triangularSystem[i], Vector{elem_type(Rx)}(vcat([root[1] for root in first(newBranchesOfRoots)], x[i], zeros(Rx, length(triangularSystem)-i))))
-            workingBranchRoots = first(newBranchesOfRoots)
         end
-
-        # Compute Trop(fTilde) =: {v_1, ..., v_k} and add u_i*t^v_j to roots for each v_j
-        println("fTilde: ", fTilde)
-        pushfirst!(workingBranch, 1) # add artificial root, otherwise code below fails
-        for v in vertices(tropical_hypersurface(trop_univariate_conversion(tropical_polynomial(fTilde))))
-            push!(roots, (u[i]*t^Rational{Int64}(v[1]), zero(QQ)))
-            add_vertex!(rootsTree)
-            add_edge!(rootsTree, last(workingBranch), n_vertices(rootsTree))
-        end
-
-        # Pick new workingLeaf
-        workingLeaf = pick_working_leaf(rootsTree, length(triangularSystem))
     end
     return roots
 end
