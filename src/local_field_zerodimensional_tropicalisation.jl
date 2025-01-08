@@ -57,17 +57,6 @@ end
 #   - G, the rootsTree with vertex 1 as root
 #   - maxDepth, the maximal depth of the tree
 # Return:
-#   - all leafs of the tree at a depth less than maxDepth
-function working_leaves(G::Graph, maxDepth::Int)
-    leaves = [i for i in 1:n_vertices(G) if degree(G, i)==1]
-    depths = [length(shortest_path_dijkstra(rootConnections, 1 , i))-1 for i in leaves]
-    return [i for (i,l) in zip(leaves, depths) if l<maxDepth]
-end
-
-# Input:
-#   - G, the rootsTree with vertex 1 as root
-#   - maxDepth, the maximal depth of the tree
-# Return:
 #   - a leaf of the tree at a depth less than maxDepth if it exists, -1 otherwise
 function pick_working_leaf(G::Graph, maxDepth::Int)
     leaves = [i for i in 1:n_vertices(G) if degree(G, i)<=1]
