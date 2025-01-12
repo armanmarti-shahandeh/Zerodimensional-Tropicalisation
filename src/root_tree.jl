@@ -1,32 +1,27 @@
 ###
 # RootTree
 # ========
-#
 # RootTree is an internal struct for tropicalizing zerodimensional triangular systems.  It consists of
 #  - system, containing a partial triangular set over the Puiseux series ring with uncertainties
 #  - tree, a directed graph representing the underlying tree with:
 #      (a) root vertex 1
 #      (b) for any edge (i,j) vertex i is the parent and vertex j is the child
 #  - roots, a vector of approximate roots in a Puiseux series field with uncertainties
-#  - precs, a vector of precisions to keep track which precision was used to compute each approximate root
-#
-#
-# Use-case 1: Main loop of the tropicalization routine of a zero-dimensional triangular set
+#  - precs, a vector of precisions to keep track which relative precision was used to compute each approximate root
+# USE-CASE 1: Main loop of the tropicalization routine of a zero-dimensional triangular set
 #  - system = {f_1, ..., f_n}, a zerodimensional triangular set over converted from the input triangular set
 #  - and for any branch (1, i_1, ..., i_k) of tree:
 #     . roots[i_k] is an approximate root of f_i(roots[i_1], ..., roots[i_{k-1}], x_k)
 #     . precs[i_k] is a rational number recording the relative precision of roots[i_1] used in the computation of roots[i_k]
 #
-#
-# Use-case 2: New leaves from a well-defined extended Newton polyhedron sigma
+# USE-CASE 2: New leaves from a well-defined extended Newton polyhedron sigma
 #  - system: empty (all information can be read off from the extended Newton polyhedron)
 #  - tree: one edge and one depth-1 vertex per lower slope of sigma
 #  - roots: each depth-1 vertex is assigned u_k*t^lambda, where lambda lower slope of sigma
 #  - precs: each depth-1 vertex is assigned 0
 # Note: lower slope = tropical point in min convention
 #
-#
-# Use-case 3: Reinforcement of an existing branch (1, i_1, ..., i_k)
+# USE-CASE 3: Existing branch (1, i_1, ..., i_k) reinforced (TODO: implement and update description)
 #  - system = {~f_k, ..., ~f_l}, where ~f_j = f_j(roots[i_1], ..., roots[i_{k-1}], x_k, ..., x_j) for some branch (1, i_1, ..., i_k)
 #  - tree: same as in the existing tree
 #  - roots + precs: [TODO: fill details here]
@@ -104,10 +99,18 @@ end
 
 # Input:
 # - Gamma, a RootTree
-# - i, an index
+# - i, a variable index
 # Return: the variable representing uncertainty in the i-th variable
 function uncertainty_variable(Gamma::RootTree, i::Int)
     return gen(base_ring(parent(first(system(Gamma)))),i)
+end
+
+# Input:
+# - Gamma, a RootTree
+# - i, a variable index
+# Return: the i-th polynomial in system(Gamma)
+function polynomial(Gamma::RootTree, i::Int)
+    return system(Gamma)[i]
 end
 
 
@@ -185,10 +188,7 @@ function graft!(Gamma::RootTree, vertex::Int, GammaNew::RootTree)
     dfs(vertex, verticesBelow)
 
     # remove data
-    println("removing vertices: ", verticesBelow)
-    println("edges before removing vertices: ", collect(edges(Gamma)))
     rem_vertices!(Gamma, verticesBelow)
-    println("edges after removing vertices: ", collect(edges(Gamma)))
 
     ###
     # Add GammaNew to Gamma below `vertex`
@@ -356,7 +356,7 @@ function sprout!(Gamma::RootTree, leaf::Int)
     GammaBranch = branch(Gamma,leaf)
     zTilde = roots(Gamma,GammaBranch)
     i = length(zTilde)
-    fi = system(Gamma)[i]
+    fi = polynomial(Gamma,i)
     R = parent(fi)
     n = ngens(R)
     xi = gen(R,i)
@@ -371,9 +371,6 @@ function sprout!(Gamma::RootTree, leaf::Int)
         ui = uncertainty_variable(Gamma,i)
         graft!(Gamma,last(GammaBranch),root_tree(sigma,ui))
     end
-
-    println(Gamma)
-    println(collect(edges(Gamma)))
 
     return canSprout
 end
