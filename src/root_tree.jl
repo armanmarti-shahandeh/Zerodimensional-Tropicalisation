@@ -379,8 +379,7 @@ end
 # Input:
 #   - Gamma, a RootTree
 #   - leaf, a leaf of Gamma
-# Return: a boolean that records whether Gamma changed
-#    (always true)
+# Return: a boolean that records whether Gamma changed (always true)
 function reinforce!(Gamma::RootTree, leaf::Int)
     # Construct the branch ending in leaf
     # Note that GammaBranch[1] is the dummy base_vertex
@@ -393,6 +392,9 @@ function reinforce!(Gamma::RootTree, leaf::Int)
 
     # TODO: implement
     @req false "not implemented yet"
+
+    # Suggestion: Just reinforce the first root in the branch of lower precision and return to main loop
+    # If the reinforced edge splits, the program flow can be messy, as `leaf` will be duplicated
 
 end
 
