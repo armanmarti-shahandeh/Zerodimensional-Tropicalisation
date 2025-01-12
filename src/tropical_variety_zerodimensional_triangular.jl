@@ -6,30 +6,28 @@ function tropical_variety_zerodimensional_triangular(triangularSystem::Vector{<:
     ###
     # Main loop
     ###
-    iterationCounter = 0
+    # iterationCounter = 0
     while true
-        # iterationCounter += 1 # for debugging purposes
-        # if iterationCounter > 5
-        #     break
-        # end
+        # for debugging purposes, aborts loop after specified number of iterations
+        # iterationCounter > 5 ? break : iterationCounter += 1
 
         # Pick a working leaf and abort loop if none exist
-        leaf = pick_leaf(Gamma)
-        println("leaf: ", leaf)
+        leaf = pick_ungrown_leaf(Gamma)
         if leaf<0
             break
         end
 
+        println("leaf: ", leaf)
+
         # try sprouting the leaf
         sproutSuccessful = sprout!(Gamma,leaf)
-
-        # if unsuccessful, try reinforcing it first
-        if !sproutSuccessful
-            @req false "not implemented yet"
+        if sproutSuccessful
+            continue
         end
+
+        # try reinforcing the leaf
+        @req false "not implemented yet"
     end
 
-    # TODO: return tropicalization instead
-    println(typeof(Gamma))
-    return Gamma
+    return tropical_points(Gamma)
 end

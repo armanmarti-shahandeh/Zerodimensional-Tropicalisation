@@ -26,3 +26,6 @@ triangularSystem = [x1^2-1, x2-(x1-1-t)]
 
 include("src/zerodimensionalTropicalization.jl")
 Gamma = tropical_variety_zerodimensional_triangular(triangularSystem,QQ(9))
+
+root_valuation(Gamma,2)
+root_valuation(Gamma,3)

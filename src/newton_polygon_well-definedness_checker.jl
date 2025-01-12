@@ -36,7 +36,7 @@ function is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde::Abst
     uncertainVals = QQFieldElem[] # coefficient valuations that are uncertain
     degsWithUncertainVal = Int[]
     for (xCoeff,xExp) in zip(coefficients(fTilde),exponents(fTilde))
-        # check whether the lowest degree of t as a polynomial in the uncertainty variable consists of a single term. for example:
+        # check whether lowest degree of t as a polynomial in the uncertainty variables is a single term. For example:
         # - valuation certain: t * (u1*u2) + t^2 * (...)
         # - valuation uncertain: t * (u1-1) + t^2 * (...)
         lowestDegreeOft = minimum([valuation(c) for c in coefficients(xCoeff)])
