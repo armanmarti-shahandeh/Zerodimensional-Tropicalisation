@@ -1,7 +1,7 @@
 using Oscar
 include("newton_polygon_well-definedness_checker.jl")
 
-#The following function takes the triangular polynomial system input, which should be a set of n polynomials living in an n-variate ring over the puiseux_series_field, and returns an n-variate polynomial_ring, over an (n-1)-variate 'imprecision' ring, over the puiseux_series_field.
+#The following function takes the triangular polynomial system input, which should be a set of n polynomials living in an n-variate ring over the puiseux_series_field, and returns the same polynomial system living in an n-variate polynomial_ring, over an (n-1)-variate 'imprecision' ring, over the puiseux_series_field.
 function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
     KtX = parent(last(triangularSystem))
     Kt = base_ring(KtX)
@@ -24,8 +24,8 @@ function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebr
 end
 
 function propogate_local_field_expansion(partialTriangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}}, branchOfRoots::Vector{<:Tuple{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, QQFieldElem}}, desiredPropogation::QQFieldElem, maxPrecision::QQFieldElem)
-    startingPoint = findfirst(!isequal(desiredPropogation), [root[2] for root in branchOfRoots])
-    branchesOfRoots = [[branchOfRoots[i][1] for i in 1:startingPoint-1]] #This is named to reflect the fact that our algebraic expansion might reveal multiple instances (associated with higher multiplicities) of our given branch, which must be replicated in the root tree.
+    polyPropogate = evaluate(first(partialTriangularSystem), vcat([first(branchOfRoots)[1]], zeros(parent(first(partialTriangularSystem)), ngens(parent(first(partialTriangularSystem)))-1)))
+    branchesOfRoots = [[root] for root in local_field_expansion(polyPropogate, QQ(valuation(first(coefficients(first(coefficients(first(branchOfRoots)[1])))))), desiredPropogation)] #This is named to reflect the fact that our algebraic expansion might reveal multiple instances (associated with higher multiplicities) of our given branch, which must be replicated in the root tree.
     while length(first(branchesOfRoots))!=length(branchOfRoots) #Each iteration of this loop makes our 'maximally approximated' list of roots one root longer.
         newBranchesOfRoots = []
         workingDepth = length(first(branchesOfRoots))+1 #i.e. the next root which we have not yet used our desiredPropogation precision on.
@@ -49,7 +49,7 @@ function pick_working_leaf(G::Graph, maxDepth::Int)
     if isempty(workingLeaves)
         return 0
     end
-    return last(workingLeaves) #First for breadth-first search, last for depth-first search?
+    return last(workingLeaves) #first for breadth-first search, last for depth-first search?
 end
 
 function zerodimensional_triangular_tropicalization(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, maxPrecision::QQFieldElem, precisionStep::QQFieldElem=QQ(1))
@@ -70,6 +70,7 @@ function zerodimensional_triangular_tropicalization(triangularSystem::Vector{<:A
         while !is_extended_newton_polyhedron_well_defined(workingPoly) #i.e. our previously computed roots need to be algebraically refined.
             partialTriangularSystem = [triangularSystem[i] for i in 1:workingDepth-1]
             propogatedPrecision = first(associatedBranchRoots)[2]+precisionStep
+            println(propogatedPrecision)
             if propogatedPrecision > maxPrecision
                 println("The input maximum precision has been reached, and the tropicalization is still not well-defined")
                 break
@@ -107,13 +108,24 @@ function zerodimensional_triangular_tropicalization(triangularSystem::Vector{<:A
     tropicalVariety = Vector{QQFieldElem}[]
     for leaf in [i for i in 1:n_vertices(rootConnections) if degree(rootConnections, i)<=1]
         rootPath = shortest_path_dijkstra(rootConnections, 1, leaf)
-        push!(tropicalVariety, [QQ(valuation(first(coefficients(first(coefficients(roots[i-1][1])))))) for i in rootPath[2:end]])
+        varElement = [QQ(valuation(first(coefficients(first(coefficients(roots[i-1][1])))))) for i in rootPath[2:end]]
+        if !(varElement in tropicalVariety)
+            push!(tropicalVariety, varElement)
+        end
     end
     return tropicalVariety
 end
 
 
-Kt,t = puiseux_series_field(QQ, 100,"t")
-R,(x1,x2,x3) = Kt["x1","x2","x3"]
-triangular = [t*x1^2+x1+1, t*x2^2+x1*x2+1, x3+x1*x2]
-zerodimensional_triangular_tropicalization(triangular, QQ(100))
+#Kt,t = puiseux_series_field(algebraic_closure(QQ), 100,"t")
+#R,(x1,x2,x3) = Kt["x1","x2","x3"]
+#triangular = [t*x1^2+x1+1, t*x2^2+x1*x2+1, x3+x1*x2]
+#zerodimensional_triangular_tropicalization(triangular, QQ(100))
+
+Kt, t = puiseux_series_field(QQ, 7, "t")
+R, (x1, x2, x3, x4) = polynomial_ring(Kt, ["x1", "x2", "x3", "x4"])
+f1 = (x1-t/(1-t))^3
+f2 = (x1 + t^-1 - t/(1-t))*(t^2*x2^2+t*x2+t)
+f3 = (x1 + t^5 - t/(1-t))*(t^-4*x3^2+t^-5*x3*x2+t^-5)
+f4 = (x1+t^4-t/(1-t))*(t^-4*x4+t^-4*x3*x2)
+zerodimensional_triangular_tropicalization([f1, f2, f3, f4], QQ(100))
