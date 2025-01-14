@@ -5,7 +5,7 @@
 #  - system, containing a partial triangular set over the Puiseux series ring with uncertainties
 #  - tree, a directed graph representing the underlying tree with:
 #      (a) root vertex 1
-#      (b) for any edge (i,j) vertex i is the parent and vertex j is the child
+#      (b) for any edge (i,j) vertex i is the parent and vertex j is the child and i<j
 #  - roots, a vector of approximate roots in a Puiseux series field with uncertainties
 #  - precs, a vector of precisions to keep track which relative precision was used to compute each approximate root
 # USE-CASE 1: Main loop of the tropicalization routine of a zero-dimensional triangular set
@@ -81,10 +81,38 @@ edges(Gamma::RootTree) = edges(tree(Gamma))
 degree(Gamma::RootTree, vertex::Int) = degree(tree(Gamma), vertex)
 shortest_path_dijkstra(Gamma::RootTree, src::Int, dst::Int) = shortest_path_dijkstra(tree(Gamma), src, dst)
 
+import Oscar.depth
+function depth(Gamma::RootTree, vertex::Int)
+    return length(shortest_path_dijkstra(Gamma, 1, vertex))
+end
+
 function leaves(Gamma::RootTree)
     # degree of directed graphs in Oscar only counts outgoing edges
     # see https://github.com/oscar-system/Oscar.jl/issues/4440
     return [vertex for vertex in 1:n_vertices(Gamma) if degree(Gamma, vertex)==0]
+end
+
+# Input:
+# - Gamma, a RootTree
+# - vertex, a vertex of Gamma
+# Return: all vertices of Gamma below vertex
+function descendants(Gamma::RootTree, vertex::Int)
+    # Create dictionary of children
+    children = Dict{Int, Vector{Int}}()
+    for edge in edges(Gamma)
+        push!(get!(children, src(edge), Int[]), dst(edge))
+    end
+
+    # DFS for vertices below `vertex`
+    function dfs(v::Int, result::Vector{Int})
+        for child in get(children, v, [])
+            push!(result, child)
+            dfs(child, result)
+        end
+    end
+    verticesBelow = Int[]
+    dfs(vertex, verticesBelow)
+    return verticesBelow
 end
 
 ###
@@ -109,10 +137,28 @@ end
 # - Gamma, a RootTree
 # - i, a variable index
 # Return: the i-th polynomial in system(Gamma)
-function polynomial(Gamma::RootTree, i::Int)
+function system_polynomial(Gamma::RootTree, i::Int)
     return system(Gamma)[i]
 end
 
+# Input:
+# - Gamma, a RootTree
+# - vertex, a non-dummy vertex
+# Return: fTilde = f_i(~z_1,...,~z_{i-1},x_i), where
+# - i is the depth of vertex
+# - ~z_1,...,~z_{i-1} are the roots on the branch up to vertex
+function working_polynomial(Gamma::RootTree, vertex::Int)
+    GammaBranch = branch(Gamma,vertex)
+    zTilde = roots(Gamma,GammaBranch)
+    i = length(zTilde)
+    fi = system_polynomial(Gamma,i)
+    Kux = parent(fi)
+    n = ngens(Kux)
+    xi = gen(Kux,i)
+    popfirst!(zTilde) # remove dummy entry of root vertex
+    fTilde = evaluate(fi, vcat(Kux.(zTilde),xi,zeros(Kux,n-i)))
+    return fTilde
+end
 
 ###
 # Geometric properties
@@ -120,7 +166,7 @@ end
 
 # Input:
 # - Gamma, a RootTree
-# - vertex, a vertex of Gamma
+# - vertex, a non-dummy vertex of Gamma
 # Return: the valuation of the root at vertex
 function root_valuation(Gamma::RootTree, vertex::Int)
     zTilde = root(Gamma,vertex)
@@ -170,24 +216,7 @@ function graft!(Gamma::RootTree, vertex::Int, GammaNew::RootTree)
     ###
     # Remove data of Gamma below `vertex`
     ###
-
-    # Create dictionary of children
-    children = Dict{Int, Vector{Int}}()
-    for edge in edges(Gamma)
-        push!(get!(children, src(edge), Int[]), dst(edge))
-    end
-
-    # DFS for vertices below `vertex`
-    function dfs(v::Int, result::Vector{Int})
-        for child in get(children, v, [])
-            push!(result, child)
-            dfs(child, result)
-        end
-    end
-    verticesBelow = Int[]
-    dfs(vertex, verticesBelow)
-
-    # remove data
+    verticesBelow = descendants(Gamma, vertex)
     rem_vertices!(Gamma, verticesBelow)
 
     ###
@@ -232,9 +261,9 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
     # Add uncertainty variables to the ambient ring of triangularSystem
     Kx = parent(first(triangularSystem))
     K = base_ring(Kx)
-    R, _ = polynomial_ring(K, ["u$i" for i in 1:ngens(Kx)])
-    Rx, _ = polynomial_ring(R, symbols(Kx))
-    phi = hom(Kx,Rx,c->R(c),gens(Rx))
+    Ku, _ = polynomial_ring(K, ["u$i" for i in 1:ngens(Kx)])
+    Kux, _ = polynomial_ring(Ku, symbols(Kx))
+    phi = hom(Kx,Kux,c->Ku(c),gens(Kux))
     system = phi.(triangularSystem)
 
     # Initialize the rest
@@ -258,10 +287,10 @@ end
 # Output:
 # - the (expected) RootTree for sigma, depth one with one vertex for each root valuation of fTilde
 function root_tree(sigma::Polyhedron, u::MPolyRingElem)
-    # compute a list of lower slopes of sigma
+    # compute a list of negated slopes of sigma
     # - v[2]<0 filters out the two non-lower slopes
     # - v[1]/v[2] is the negated slope as v is an outer normal vector
-    lowerSlopes = [ -v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 ]
+    negatedSlopes = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 ]
 
     # construct the RootTree
     system = MPolyRingElem[]
@@ -270,7 +299,7 @@ function root_tree(sigma::Polyhedron, u::MPolyRingElem)
     roots = zeros(Ku,1)
     precs = QQFieldElem[0]
     t = gen(K)
-    for lambda in lowerSlopes
+    for lambda in negatedSlopes
         # For each lower slope lambda add
         #  - u*t^lambda to roots,
         #  - 0 to precs,
@@ -326,8 +355,7 @@ end
 #   - Gamma, a RootTree
 # Return:
 #   - a leaf of the tree at a depth less than maxDepth if it exists, -1 otherwise
-# TODO: experiment with different picking strategies
-function pick_ungrown_leaf(Gamma::RootTree)
+function pick_ungrown_leaf(Gamma::RootTree; strategy::Symbol=:depth_first)
     GammaLeaves = leaves(Gamma)
     depths = length.(shortest_path_dijkstra.(Ref(Gamma), 1, GammaLeaves)) .-1
     maxDepth = length(system(Gamma))
@@ -335,7 +363,13 @@ function pick_ungrown_leaf(Gamma::RootTree)
     if isempty(ungrownLeaves)
         return -1
     end
-    return first(ungrownLeaves)
+    if strategy == :depth_first
+        return last(ungrownLeaves)
+    end
+    if strategy == :width_first
+        return first(ungrownLeaves)
+    end
+    error("Unknown picking strategy: $strategy")
 end
 
 # Input:
@@ -350,26 +384,18 @@ end
 # Input:
 #   - Gamma, a RootTree
 #   - leaf, a leaf of Gamma
-# Return: a boolean that records whether Gamma changed
+# Return: a boolean that records whether Gamma has changed
 function sprout!(Gamma::RootTree, leaf::Int)
     # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
-    GammaBranch = branch(Gamma,leaf)
-    zTilde = roots(Gamma,GammaBranch)
-    i = length(zTilde)
-    fi = polynomial(Gamma,i)
-    R = parent(fi)
-    n = ngens(R)
-    xi = gen(R,i)
-    popfirst!(zTilde) # remove dummy entry of root vertex
-    fTilde = evaluate(fi, vcat(R.(zTilde),xi,zeros(R,n-i)))
+    fTilde = working_polynomial(Gamma,leaf)
     println("fTilde: ", fTilde)
 
     # check whether the extended newton polyhedron is well defined
     # if yes, use it to sprout Gamma at leaf
     canSprout, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
     if canSprout
-        ui = uncertainty_variable(Gamma,i)
-        graft!(Gamma,last(GammaBranch),root_tree(sigma,ui))
+        ui = uncertainty_variable(Gamma,depth(Gamma,leaf))
+        graft!(Gamma,leaf,root_tree(sigma,ui))
     end
 
     return canSprout
@@ -382,14 +408,28 @@ end
 # Return: a boolean that records whether Gamma changed (always true)
 function reinforce!(Gamma::RootTree, leaf::Int)
     # Construct the branch ending in leaf
-    # Note that GammaBranch[1] is the dummy base_vertex
     GammaBranch = branch(Gamma,leaf)
+    popfirst!(GammaBranch) # remove the dummy vertex
 
     # If precision used for leaf equals the current precision at the base of the branch, increase it
-    if prec(Gamma,GammaBranch[2])==prec(Gamma,leaf)
-        increase_precision!(Gamma,GammaBranch[2])
+    precBase = prec(Gamma,GammaBranch[1])
+    if precBase==prec(Gamma,leaf)
+        increase_precision!(Gamma,GammaBranch[1])
     end
 
+    # Identify the first edge to be reinforced
+    i = findfirst(vertex->prec(Gamma,vertex)!=precBase, GammaBranch)
+    vertexToReinforce = GammaBranch[i]
+    fiTilde = working_polynomial(Gamma,vertexToReinforce)
+    println("fiTilde: ", fiTilde)
+
+    # substitute x_i -> x_i + roots(Gamma,vertexToReinforce) into fiTilde
+
+    tailValuation = valuation(last(coefficients(roots(Gamma,vertexToReinforce))))
+    tails = local_field_expansion(fiTilde, tailValuation, precMax(Gamma))
+
+    for tail in tails
+    end
     # TODO: implement
     @req false "not implemented yet"
 

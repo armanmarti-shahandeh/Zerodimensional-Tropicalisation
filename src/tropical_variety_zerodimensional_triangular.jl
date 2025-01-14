@@ -17,17 +17,16 @@ function tropical_variety_zerodimensional_triangular(triangularSystem::Vector{<:
             break
         end
 
+        println(Gamma)
         println("leaf: ", leaf)
 
         # try sprouting the leaf
         sproutSuccessful = sprout!(Gamma,leaf)
-        if sproutSuccessful
-            continue
+        if !sproutSuccessful
+            # try reinforcing the leaf
+            reinforce!(Gamma,leaf)
         end
-
-        # try reinforcing the leaf
-        @req false "not implemented yet"
     end
 
-    return tropical_points(Gamma)
+    return Gamma # tropical_points(Gamma)
 end
