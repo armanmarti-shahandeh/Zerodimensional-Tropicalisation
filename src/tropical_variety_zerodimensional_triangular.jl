@@ -14,10 +14,7 @@ function tropical_variety_zerodimensional_triangular(triangularSystem::Vector{<:
         if leaf<0
             break
         end
-        println(Gamma)
-        println("leaf: ", leaf)
         sproutSuccessful = sprout!(Gamma,leaf)  # try sprouting the leaf
-        println("sproutSuccessful: ", sproutSuccessful)
         if !sproutSuccessful
             reinforce!(Gamma,leaf)     # try reinforcing the leaf
         end

@@ -53,6 +53,7 @@ end
 ###
 # Accessors
 ###
+import Oscar.roots
 system(Gamma::RootTree) = Gamma.system
 tree(Gamma::RootTree) = Gamma.tree
 roots(Gamma::RootTree) = Gamma.roots
@@ -270,6 +271,29 @@ function root_tree()
     return RootTree()
 end
 
+#Comments to add here
+function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
+    KtX = parent(last(triangularSystem))
+    Kt = base_ring(KtX)
+    n = ngens(KtX)
+    Su, u = polynomial_ring(Kt, ["u$i" for i in 1:n])
+    Rx, x = polynomial_ring(Su, symbols(KtX))
+    convertedTriangularSystem = AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}[]
+    for poly in triangularSystem
+        newPoly = zero(Rx)
+        for (coeff, exp) in zip(coefficients(poly), exponents(poly))
+            monomial = Su(coeff)
+            for (i, e) in enumerate(exp)
+                monomial *= x[i]^e
+            end
+            newPoly += monomial
+        end
+        push!(convertedTriangularSystem, newPoly)
+    end
+    return convertedTriangularSystem
+end
+
+
 # Input:
 # - triangularSystem, a zerodimensional triangular set over a Puiseux series field
 # - maxPrecision, a maximum precision as a safeguard for infinite loops
@@ -279,17 +303,23 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
     @req is_zerodimensional_triangular_set(triangularSystem) "Input must be a zerodimensional triangular set."
 
     # Add uncertainty variables to the ambient ring of triangularSystem
-    Kx = parent(first(triangularSystem))
-    K = base_ring(Kx)
-    Ku, _ = polynomial_ring(K, ["u$i" for i in 1:ngens(Kx)])
-    Kux, _ = polynomial_ring(Ku, symbols(Kx))
-    phi = hom(Kx,Kux,c->Ku(c),gens(Kux))
-    system = phi.(triangularSystem)
-
+    #Kx = parent(first(triangularSystem))
+    #K = base_ring(Kx)
+    #Ku, _ = polynomial_ring(K, ["u$i" for i in 1:ngens(Kx)])
+    #Kux, _ = polynomial_ring(Ku, symbols(Kx))
+    #phi = hom(Kx,Kux,c->Ku(c),gens(Kux))
+    #system = phi.(triangularSystem)
+    
     # Initialize the rest
+    #tree = Graph{Directed}(1)
+    #roots = zeros(Ku,1)
+    #precs = QQFieldElem[precMax]
+
+    system = imprecision_tracker_injection(triangularSystem)
     tree = Graph{Directed}(1)
-    roots = zeros(Ku,1)
+    roots = zeros(base_ring(parent(first(system))), 1)
     precs = QQFieldElem[precMax]
+
 
     return RootTree(system, tree, roots, precs, precMax, precStep)
 end
@@ -400,8 +430,7 @@ end
 function sprout!(Gamma::RootTree, leaf::Int)
     # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
     fTilde = working_polynomial(Gamma,leaf)
-    println("fTilde: ", fTilde)
-
+    
     # check whether the extended newton polyhedron is well defined
     # if yes, use it to sprout Gamma at leaf
     canSprout, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
@@ -424,6 +453,9 @@ function improve_root!(Gamma::RootTree, vertex::Int)
     rootToImprove = root(Gamma, vertex)
     currentApproximation = collect(coefficients(rootToImprove))[end]
     tailValuation = QQ(valuation(first(coefficients(rootToImprove))))
+    if length(collect(coefficients(rootToImprove)))==1 # This addresses the case where we do not have a currentApproximation to call, with only one coefficient associated to uncertainty
+        currentApproximation = zero(Ku)
+    end
     rootBranch = branch(Gamma, vertex)
     i = depth(Gamma, vertex)-1
     xi = gen(Kux, i)
@@ -440,15 +472,15 @@ function improve_root!(Gamma::RootTree, vertex::Int)
         # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point.
         # To avoid indexing issues in the higher-level reinforce! function, we will not use graft! for this.
         assocVertices = vcat(rootBranch[end-1:end], sort(descendants(Gamma, vertex))) # We use sort(.) here so that, when grafting onto new vertices, we still maintain the necessary structure that higher vertices in the tree have lower index.
-        assocEdges = vcat(Edge(rootBranch[end-1], vertex), [edge for edge in edges(Gamma) if dst(edge) in verticesBelow]) #Finding all the edges that need to be duplicated
+        assocEdges = [edge for edge in edges(Gamma) if src(edge) in assocVertices] #Finding all the edges that need to be duplicated
         N = n_vertices(Gamma)
         k = length(assocVertices)-1 #We need to duplicate all the vertices below the improved root, as well as the new instance of the root itself.
         for i in 2:length(improvedRoots)
             add_vertices!(Gamma.tree, k)
-            shiftedIndices=vcat(rootBranch[end-1], [N+1+k*(i-2):N+k*(i-1)]) #To make referring to our gluings more simple
+            shiftedIndices=vcat(rootBranch[end-1], collect(N+1+k*(i-2):N+k*(i-1))) #To make referring to our gluings more simple
             for edgeTransfer in assocEdges
-                srcIndex = findfirst(isequal(src(edgeTransfer), assocVertices))
-                dstIndex = findfirst(isequal(dst(edgeTransfer), assocVertices))
+                srcIndex = findfirst(isequal(src(edgeTransfer)), assocVertices)
+                dstIndex = findfirst(isequal(dst(edgeTransfer)), assocVertices)
                 add_edge!(Gamma.tree, shiftedIndices[srcIndex], shiftedIndices[dstIndex])
             end
             push!(Gamma.roots, currentApproximation + Ku(improvedRoots[i])) #The additional instance of the improved root itself.
@@ -499,7 +531,6 @@ end
 # Return: the points in the tropicalizations
 function tropical_points(Gamma::RootTree)
     GammaLeaves = leaves(Gamma)
-    println("GammaLeaves: ", GammaLeaves)
     GammaTrop = Vector{QQFieldElem}[]
     for GammaLeaf in GammaLeaves
         GammaBranch = branch(Gamma,GammaLeaf)

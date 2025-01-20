@@ -1,27 +1,31 @@
 using Oscar
 
-Kt,t = puiseux_series_field(QQ,100,"t")
-# nu = tropical_semiring_map(K, t)
 
 
 ###
 # Example with uniquely determined tropicalization
 ###
+Kt,t = puiseux_series_field(algebraic_closure(QQ),100,"t")
 R,(x1,x2,x3) = Kt["x1","x2","x3"]
 triangularSystem = [t*x1^2+x1+1, t*x2^2+x1*x2+1, x3+x1*x2]
+tropical_variety_zerodimensional_triangular(triangularSystem, QQ(10))
 
 ###
 # Example where increased precision in ~z1 is needed
 ###
+Kt,t = puiseux_series_field(algebraic_closure(QQ),100,"t")
 R,(x1,x2) = Kt["x1","x2"]
 triangularSystem = [x1-(1+t+t^2+t^3), x2-(x1-1-t)]
+tropical_variety_zerodimensional_triangular(triangularSystem, QQ(10))
 
 ###
 # Example where increase precision in ~z1 is needed
 #   and old branches split
 ###
+Kt,t = puiseux_series_field(algebraic_closure(QQ),100,"t")
 R,(x1,x2) = Kt["x1","x2"]
 triangularSystem = [x1^2-1, x2-(x1-1-t)]
+tropical_variety_zerodimensional_triangular(triangularSystem, QQ(10))
 
 
 include("src/zerodimensionalTropicalization.jl")
@@ -30,6 +34,7 @@ Gamma = tropical_variety_zerodimensional_triangular(triangularSystem,QQ(9))
 root_valuation(Gamma,2)
 root_valuation(Gamma,3)
 
+Kt,t = puiseux_series_field(QQ, 100, "t")
 R, (x1, x2, x3, x4) = polynomial_ring(Kt, ["x1", "x2", "x3", "x4"])
 f1 = (x1-t/(1-t))^3
 f2 = (x1 + t^-1 - t/(1-t))*(t^2*x2^2+t*x2+t)
