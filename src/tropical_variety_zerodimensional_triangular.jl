@@ -1,7 +1,7 @@
 function tropical_variety_zerodimensional_triangular(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, maxPrecision::QQFieldElem, precisionStep::QQFieldElem=QQ(1))
 
     # Initialize book-keeping data
-    Gamma = root_tree(triangularSystem,maxPrecision)
+    Gamma = root_tree(triangularSystem, maxPrecision, precisionStep)
 
     ###
     # Main loop
@@ -10,23 +10,17 @@ function tropical_variety_zerodimensional_triangular(triangularSystem::Vector{<:
     while true
         # for debugging purposes, aborts loop after specified number of iterations
         # iterationCounter > 5 ? break : iterationCounter += 1
-
-        # Pick a working leaf and abort loop if none exist
-        leaf = pick_ungrown_leaf(Gamma)
+        leaf = pick_ungrown_leaf(Gamma) # Pick a working leaf and abort loop if none exist
         if leaf<0
             break
         end
-
         println(Gamma)
         println("leaf: ", leaf)
-
-        # try sprouting the leaf
-        sproutSuccessful = sprout!(Gamma,leaf)
+        sproutSuccessful = sprout!(Gamma,leaf)  # try sprouting the leaf
+        println("sproutSuccessful: ", sproutSuccessful)
         if !sproutSuccessful
-            # try reinforcing the leaf
-            reinforce!(Gamma,leaf)
+            reinforce!(Gamma,leaf)     # try reinforcing the leaf
         end
     end
-
-    return Gamma # tropical_points(Gamma)
+    return tropical_points(Gamma)
 end

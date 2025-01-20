@@ -1,3 +1,5 @@
+
+
 ###
 # RootTree
 # ========
@@ -57,7 +59,7 @@ roots(Gamma::RootTree) = Gamma.roots
 roots(Gamma::RootTree, branch::Vector{Int}) = roots(Gamma)[branch]
 root(Gamma::RootTree, vertex::Int) = roots(Gamma)[vertex]
 precs(Gamma::RootTree) = Gamma.precs
-precs(Gamma::RootTree, branch::Vector{Int}) = roots(Gamma)[branch]
+precs(Gamma::RootTree, branch::Vector{Int}) = precs(Gamma)[branch]
 prec(Gamma::RootTree, vertex::Int) = precs(Gamma)[vertex]
 precMax(Gamma::RootTree) = Gamma.precMax
 precStep(Gamma::RootTree) = Gamma.precStep
@@ -115,6 +117,16 @@ function descendants(Gamma::RootTree, vertex::Int)
     return verticesBelow
 end
 
+# Input:
+#   - Gamma, a RootTree
+#   - vertex, a vertex of Gamma
+# Return: (b,GammaSprout)
+#   - all vertices on the branch of Gamma ending at vertex
+function branch(Gamma::RootTree, vertex::Int)
+    return shortest_path_dijkstra(Gamma, 1, vertex)
+end
+
+
 ###
 # Algebraic properties
 ###
@@ -146,7 +158,7 @@ end
 # - vertex, a non-dummy vertex
 # Return: fTilde = f_i(~z_1,...,~z_{i-1},x_i), where
 # - i is the depth of vertex
-# - ~z_1,...,~z_{i-1} are the roots on the branch up to vertex
+# - ~z_1,...,~z_{i-1} are the roots on the branch up to and including the vertex
 function working_polynomial(Gamma::RootTree, vertex::Int)
     GammaBranch = branch(Gamma,vertex)
     zTilde = roots(Gamma,GammaBranch)
@@ -155,10 +167,12 @@ function working_polynomial(Gamma::RootTree, vertex::Int)
     Kux = parent(fi)
     n = ngens(Kux)
     xi = gen(Kux,i)
+    partialCompInWorkingVariable = zero(Kux)
     popfirst!(zTilde) # remove dummy entry of root vertex
-    fTilde = evaluate(fi, vcat(Kux.(zTilde),xi,zeros(Kux,n-i)))
+    fTilde = evaluate(fi, vcat(Kux.(zTilde),xi, zeros(Kux,n-i)))
     return fTilde
 end
+
 
 ###
 # Geometric properties
@@ -200,9 +214,15 @@ function rem_vertices!(Gamma::RootTree, vertices::Vector{Int})
     return N!=n_vertices(Gamma)
 end
 
+
+# A simple tool for updating precision: if called on the initial root, it will up the precision by the precision step, if called on any subsequent root, it will update the precision to match that of the initial root.
 function increase_precision!(Gamma::RootTree, vertex::Int)
-    Gamma.precs[vertex] += precStep(Gamma)
-    @req Gamma.precs[vertex] <= precMax(Gamma) "Precision exceeds maximum precision."
+    if depth(Gamma, vertex) == 2
+        Gamma.precs[vertex] += precStep(Gamma)
+        @req Gamma.precs[vertex] <= precMax(Gamma) "Precision exceeds maximum precision."
+    else
+       Gamma.precs[vertex] = prec(Gamma, branch(Gamma, vertex)[2])  
+    end
 end
 
 # Input:
@@ -268,7 +288,7 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
 
     # Initialize the rest
     tree = Graph{Directed}(1)
-    roots = zeros(R,1)
+    roots = zeros(Ku,1)
     precs = QQFieldElem[precMax]
 
     return RootTree(system, tree, roots, precs, precMax, precStep)
@@ -286,7 +306,7 @@ end
 # - prec, a precision value for the precisions
 # Output:
 # - the (expected) RootTree for sigma, depth one with one vertex for each root valuation of fTilde
-function root_tree(sigma::Polyhedron, u::MPolyRingElem)
+function elementary_root_tree(sigma::Polyhedron, u::MPolyRingElem)
     # compute a list of negated slopes of sigma
     # - v[2]<0 filters out the two non-lower slopes
     # - v[1]/v[2] is the negated slope as v is an outer normal vector
@@ -298,7 +318,7 @@ function root_tree(sigma::Polyhedron, u::MPolyRingElem)
     Ku = parent(u)
     roots = zeros(Ku,1)
     precs = QQFieldElem[0]
-    t = gen(K)
+    t = gen(base_ring(Ku))
     for lambda in negatedSlopes
         # For each lower slope lambda add
         #  - u*t^lambda to roots,
@@ -372,14 +392,6 @@ function pick_ungrown_leaf(Gamma::RootTree; strategy::Symbol=:depth_first)
     error("Unknown picking strategy: $strategy")
 end
 
-# Input:
-#   - Gamma, a RootTree
-#   - leaf, a leaf of Gamma
-# Return: (b,GammaSprout)
-#   - all vertices on the branch of Gamma ending at leaf
-function branch(Gamma::RootTree, leaf::Int)
-    return shortest_path_dijkstra(Gamma, 1, leaf)
-end
 
 # Input:
 #   - Gamma, a RootTree
@@ -395,10 +407,58 @@ function sprout!(Gamma::RootTree, leaf::Int)
     canSprout, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
     if canSprout
         ui = uncertainty_variable(Gamma,depth(Gamma,leaf))
-        graft!(Gamma,leaf,root_tree(sigma,ui))
+        graft!(Gamma,leaf, elementary_root_tree(sigma,ui))
     end
 
     return canSprout
+end
+
+# Input:
+#   - Gamma, a RootTree
+#   - a vertex in Gamma
+#Return: a boolean to record whether the root AT the given vertex has been improved. Note that preceding this function, we need to specify the increased precision of the root, through increase_precision!
+
+function improve_root!(Gamma::RootTree, vertex::Int)
+    Kux = parent(system_polynomial(Gamma, 1))  
+    Ku = base_ring(Kux)
+    rootToImprove = root(Gamma, vertex)
+    currentApproximation = collect(coefficients(rootToImprove))[end]
+    tailValuation = QQ(valuation(first(coefficients(rootToImprove))))
+    rootBranch = branch(Gamma, vertex)
+    i = depth(Gamma, vertex)-1
+    xi = gen(Kux, i)
+    if i==1 #Addresses the case where the root we are improving is of the first polynomial in the triangular system: not subject to any constraints.
+        calcPoly = evaluate(system_polynomial(Gamma, 1), vcat(Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-1))) # Substitutes in the already computed 
+        improvedRoots = local_field_expansion(calcPoly, tailValuation, prec(Gamma, vertex))
+    else
+        calcPoly = working_polynomial(Gamma, rootBranch[end-1]) #This gives us f_i(z_1, ..., z_i-1, x_i)
+        calcPoly = evaluate(calcPoly, vcat(zeros(Kux, i-1), Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-i))) # This then substitutes x_i -> alreadyComputed + x_i, making this monomial ready for local_field_expansion.
+        improvedRoots = local_field_expansion(calcPoly, tailValuation, precMax(Gamma))
+    end
+    Gamma.roots[vertex] = currentApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
+    if length(improvedRoots)>1    
+        # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point.
+        # To avoid indexing issues in the higher-level reinforce! function, we will not use graft! for this.
+        assocVertices = vcat(rootBranch[end-1:end], sort(descendants(Gamma, vertex))) # We use sort(.) here so that, when grafting onto new vertices, we still maintain the necessary structure that higher vertices in the tree have lower index.
+        assocEdges = vcat(Edge(rootBranch[end-1], vertex), [edge for edge in edges(Gamma) if dst(edge) in verticesBelow]) #Finding all the edges that need to be duplicated
+        N = n_vertices(Gamma)
+        k = length(assocVertices)-1 #We need to duplicate all the vertices below the improved root, as well as the new instance of the root itself.
+        for i in 2:length(improvedRoots)
+            add_vertices!(Gamma.tree, k)
+            shiftedIndices=vcat(rootBranch[end-1], [N+1+k*(i-2):N+k*(i-1)]) #To make referring to our gluings more simple
+            for edgeTransfer in assocEdges
+                srcIndex = findfirst(isequal(src(edgeTransfer), assocVertices))
+                dstIndex = findfirst(isequal(dst(edgeTransfer), assocVertices))
+                add_edge!(Gamma.tree, shiftedIndices[srcIndex], shiftedIndices[dstIndex])
+            end
+            push!(Gamma.roots, currentApproximation + Ku(improvedRoots[i])) #The additional instance of the improved root itself.
+            push!(Gamma.precs, prec(Gamma, vertex))
+            for j in 3:k+1 #Duplicating the original information onto the vertices below the improved root
+                push!(Gamma.roots, root(Gamma, assocVertices[j]))
+                push!(Gamma.precs, prec(Gamma, assocVertices[j]))
+            end
+        end
+    end
 end
 
 
@@ -407,35 +467,27 @@ end
 #   - leaf, a leaf of Gamma
 # Return: a boolean that records whether Gamma changed (always true)
 function reinforce!(Gamma::RootTree, leaf::Int)
-    # Construct the branch ending in leaf
-    GammaBranch = branch(Gamma,leaf)
+    GammaBranch = branch(Gamma,leaf) # Construct the branch ending in leaf
     popfirst!(GammaBranch) # remove the dummy vertex
-
     # If precision used for leaf equals the current precision at the base of the branch, increase it
     precBase = prec(Gamma,GammaBranch[1])
-    if precBase==prec(Gamma,leaf)
-        increase_precision!(Gamma,GammaBranch[1])
+    if precBase==prec(Gamma,leaf)  # The case where our initial computation has already been carried through, and thus needs improvement
+        vertexToReinforce = GammaBranch[1]
+    else
+        i = findfirst(vertex->prec(Gamma,vertex)!=precBase, GammaBranch)
+        vertexToReinforce = GammaBranch[i]           
     end
+    increase_precision!(Gamma, vertexToReinforce) #This simply updates the precision stored, and then improve_root! below actually carries out the computation to implement this new precision
+    improve_root!(Gamma, vertexToReinforce)
+    return true
+    
 
-    # Identify the first edge to be reinforced
-    i = findfirst(vertex->prec(Gamma,vertex)!=precBase, GammaBranch)
-    vertexToReinforce = GammaBranch[i]
-    fiTilde = working_polynomial(Gamma,vertexToReinforce)
-    println("fiTilde: ", fiTilde)
-
-    # substitute x_i -> x_i + roots(Gamma,vertexToReinforce) into fiTilde
-
-    tailValuation = valuation(last(coefficients(roots(Gamma,vertexToReinforce))))
-    tails = local_field_expansion(fiTilde, tailValuation, precMax(Gamma))
-
-    for tail in tails
-    end
     # TODO: implement
-    @req false "not implemented yet"
+    #@req false "not implemented yet"
 
     # Suggestion: Just reinforce the first root in the branch of lower precision and return to main loop
     # If the reinforced edge splits, the program flow can be messy, as `leaf` will be duplicated
-
+    # Arman {I agree with the above, and the improve_root! function is such that it will manufacture the duplicated sub-tree at that point, and will}
 end
 
 
@@ -453,7 +505,5 @@ function tropical_points(Gamma::RootTree)
         GammaBranch = branch(Gamma,GammaLeaf)
         push!(GammaTrop, root_valuation.(Ref(Gamma),GammaBranch[2:end]))
     end
-
-    println(Gamma)
     return GammaTrop
 end
