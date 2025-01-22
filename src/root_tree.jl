@@ -271,7 +271,10 @@ function root_tree()
     return RootTree()
 end
 
-#Comments to add here
+# Input: 
+#   - A triangular polynomial system over the puiseux_series_field.
+# Return: The same triangular polynomial system, over an 'imprecision' ring with 'uncertainty' variables, over the puiseux_series_field.
+
 function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
     KtX = parent(last(triangularSystem))
     Kt = base_ring(KtX)
@@ -314,6 +317,7 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
     #tree = Graph{Directed}(1)
     #roots = zeros(Ku,1)
     #precs = QQFieldElem[precMax]
+    # {Arman}: I have replaced the above code with the original imprecision_tracker_injection function, as I was having datatype issues which prevented calculations with the original local_field_expansion functions
 
     system = imprecision_tracker_injection(triangularSystem)
     tree = Graph{Directed}(1)
@@ -444,8 +448,42 @@ end
 
 # Input:
 #   - Gamma, a RootTree
+#   - vertex, a vertex in Gamma
+#   - newInstances, a vector of length i, containing the i new root instances that split at "vertex"
+# Return: a new RootTree GammaNew, which is the sub-tree of Gamma with dummy root representing the parent of "vertex", such that the structure of the tree rooted at "vertex" has been entirely duplicated, consisting of i new copies 
+
+function replicate_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:MPolyRingElem})
+    # Necessary variables for initialising the new RootTree
+    newSystem = MPolyRingElem[]
+    newTree = Graph{Directed}(1)
+    Ku = parent(first(newInstances)) 
+    newRoots = zeros(Ku,1)
+    newPrecs = QQFieldElem[0]
+    # Making reference vectors to make the duplications
+    assocVertices = vcat(vertex, sort(descendants(Gamma, vertex)))
+    assocEdges = [edge for edge in edges(Gamma) if dst(edge) in assocVertices[2:end]]
+    k = length(assocVertices)
+    for i in 1:length(newInstances)
+        add_vertices!(newTree, k) # Adding all the necessary tree data
+        add_edge!(newTree, 1, 2+(i-1)*k) # Connecting the 'dummy' root vertex to this new improvedRoot instance
+        graftedVertices = collect(2+(i-1)*k:1+i*k)
+        for edgeToTransfer in assocEdges
+            srcIndex = findfirst(isequal(src(edgeToTransfer)), assocVertices)
+            dstIndex = findfirst(isequal(dst(edgeToTransfer)), assocVertices)
+            add_edge!(newTree, graftedVertices[srcIndex], graftedVertices[dstIndex])
+        end
+        append!(newRoots, vcat(newInstances[i], collect(Iterators.drop(roots(Gamma, assocVertices), 1)))) # Adding the new root instance, as well as all the duplicated roots/precisions
+        append!(newPrecs, precs(Gamma, assocVertices))
+    end
+    return RootTree(newSystem, newTree, newRoots, newPrecs)
+end
+
+
+# Input:
+#   - Gamma, a RootTree
 #   - a vertex in Gamma
-#Return: a boolean to record whether the root AT the given vertex has been improved. Note that preceding this function, we need to specify the increased precision of the root, through increase_precision!
+# Return: a boolean to record whether the root AT the given vertex has been improved (always true). 
+# Note that, separate to this function, we need to manually update the increased precision of the root, through increase_precision!
 
 function improve_root!(Gamma::RootTree, vertex::Int)
     Kux = parent(system_polynomial(Gamma, 1))  
@@ -469,28 +507,12 @@ function improve_root!(Gamma::RootTree, vertex::Int)
     end
     Gamma.roots[vertex] = currentApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
     if length(improvedRoots)>1    
-        # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point.
-        # To avoid indexing issues in the higher-level reinforce! function, we will not use graft! for this.
-        assocVertices = vcat(rootBranch[end-1:end], sort(descendants(Gamma, vertex))) # We use sort(.) here so that, when grafting onto new vertices, we still maintain the necessary structure that higher vertices in the tree have lower index.
-        assocEdges = [edge for edge in edges(Gamma) if src(edge) in assocVertices] #Finding all the edges that need to be duplicated
-        N = n_vertices(Gamma)
-        k = length(assocVertices)-1 #We need to duplicate all the vertices below the improved root, as well as the new instance of the root itself.
-        for i in 2:length(improvedRoots)
-            add_vertices!(Gamma.tree, k)
-            shiftedIndices=vcat(rootBranch[end-1], collect(N+1+k*(i-2):N+k*(i-1))) #To make referring to our gluings more simple
-            for edgeTransfer in assocEdges
-                srcIndex = findfirst(isequal(src(edgeTransfer)), assocVertices)
-                dstIndex = findfirst(isequal(dst(edgeTransfer)), assocVertices)
-                add_edge!(Gamma.tree, shiftedIndices[srcIndex], shiftedIndices[dstIndex])
-            end
-            push!(Gamma.roots, currentApproximation + Ku(improvedRoots[i])) #The additional instance of the improved root itself.
-            push!(Gamma.precs, prec(Gamma, vertex))
-            for j in 3:k+1 #Duplicating the original information onto the vertices below the improved root
-                push!(Gamma.roots, root(Gamma, assocVertices[j]))
-                push!(Gamma.precs, prec(Gamma, assocVertices[j]))
-            end
-        end
+        # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point, using replicate_subtree
+        improvedRoots = [currentApproximation + Ku(improvedRoot) for improvedRoot in improvedRoots]
+        duplicateTree = replicate_subtree(Gamma, vertex, improvedRoots)
+        graft!(Gamma, rootBranch[end-1], duplicateTree)
     end
+    return true
 end
 
 
@@ -512,10 +534,6 @@ function reinforce!(Gamma::RootTree, leaf::Int)
     increase_precision!(Gamma, vertexToReinforce) #This simply updates the precision stored, and then improve_root! below actually carries out the computation to implement this new precision
     improve_root!(Gamma, vertexToReinforce)
     return true
-    
-
-    # TODO: implement
-    #@req false "not implemented yet"
 
     # Suggestion: Just reinforce the first root in the branch of lower precision and return to main loop
     # If the reinforced edge splits, the program flow can be messy, as `leaf` will be duplicated
