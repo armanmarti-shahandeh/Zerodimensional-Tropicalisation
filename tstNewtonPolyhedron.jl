@@ -8,7 +8,7 @@ fTilde = x1^2+x1+t
 
 include("src/zerodimensionalTropicalization.jl")
 wellDefined, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
-Gamma = root_tree(sigma,u1)
+Gamma = elementary_root_tree(sigma,u1)
 
 visualize(Gamma)
 

@@ -51,7 +51,7 @@ end
 
 
 ###
-# Accessors
+# ACCESSORS
 ###
 import Oscar.roots
 system(Gamma::RootTree) = Gamma.system
@@ -160,7 +160,7 @@ end
 # Return: fTilde = f_i(~z_1,...,~z_{i-1},x_i), where
 # - i is the depth of vertex
 # - ~z_1,...,~z_{i-1} are the roots on the branch up to and including the vertex
-function working_polynomial(Gamma::RootTree, vertex::Int)
+function extension_polynomial(Gamma::RootTree, vertex::Int)
     GammaBranch = branch(Gamma,vertex)
     zTilde = roots(Gamma,GammaBranch)
     i = length(zTilde)
@@ -168,12 +168,14 @@ function working_polynomial(Gamma::RootTree, vertex::Int)
     Kux = parent(fi)
     n = ngens(Kux)
     xi = gen(Kux,i)
-    partialCompInWorkingVariable = zero(Kux)
     popfirst!(zTilde) # remove dummy entry of root vertex
     fTilde = evaluate(fi, vcat(Kux.(zTilde),xi, zeros(Kux,n-i)))
     return fTilde
 end
 
+function reinforcement_polynomial(Gamma::RootTree, vertex::Int)
+    
+end
 
 ###
 # Geometric properties
@@ -234,16 +236,6 @@ end
 # WARNING: Since vertices of a graph need to be numbered 1 to n,
 #  we assume that Gamma has less vertices below u than GammaNew has vertices overall
 function graft!(Gamma::RootTree, vertex::Int, GammaNew::RootTree)
-    ###
-    # Remove data of Gamma below `vertex`
-    ###
-    verticesBelow = descendants(Gamma, vertex)
-    rem_vertices!(Gamma, verticesBelow)
-
-    ###
-    # Add GammaNew to Gamma below `vertex`
-    ###
-
     # add vertices and edges of GammaNew to Gamma
     N = n_vertices(Gamma)
     k = n_vertices(GammaNew)
@@ -271,31 +263,6 @@ function root_tree()
     return RootTree()
 end
 
-# # Input:
-# #   - A triangular polynomial system over the puiseux_series_field.
-# # Return: The same triangular polynomial system, over an 'imprecision' ring with 'uncertainty' variables, over the puiseux_series_field.
-# function imprecision_tracker_injection(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
-#     KtX = parent(last(triangularSystem))
-#     Kt = base_ring(KtX)
-#     n = ngens(KtX)
-#     Su, u = polynomial_ring(Kt, ["u$i" for i in 1:n])
-#     Rx, x = polynomial_ring(Su, symbols(KtX))
-#     convertedTriangularSystem = AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}[]
-#     for poly in triangularSystem
-#         newPoly = zero(Rx)
-#         for (coeff, exp) in zip(coefficients(poly), exponents(poly))
-#             monomial = Su(coeff)
-#             for (i, e) in enumerate(exp)
-#                 monomial *= x[i]^e
-#             end
-#             newPoly += monomial
-#         end
-#         push!(convertedTriangularSystem, newPoly)
-#     end
-#     return convertedTriangularSystem
-# end
-
-
 # Input:
 # - triangularSystem, a zerodimensional triangular set over a Puiseux series field
 # - maxPrecision, a maximum precision as a safeguard for infinite loops
@@ -316,13 +283,6 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
     tree = Graph{Directed}(1)
     roots = zeros(Ku,1)
     precs = QQFieldElem[precMax]
-
-    # {Arman}: I have replaced the above code with the original imprecision_tracker_injection function, as I was having datatype issues which prevented calculations with the original local_field_expansion functions
-    # system = imprecision_tracker_injection(triangularSystem)
-    # tree = Graph{Directed}(1)
-    # roots = zeros(base_ring(parent(first(system))), 1)
-    # precs = QQFieldElem[precMax]
-
 
     return RootTree(system, tree, roots, precs, precMax, precStep)
 end
@@ -430,19 +390,18 @@ end
 #   - Gamma, a RootTree
 #   - leaf, a leaf of Gamma
 # Return: a boolean that records whether Gamma has changed
-function sprout!(Gamma::RootTree, leaf::Int)
+function extend!(Gamma::RootTree, leaf::Int)
     # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
-    fTilde = working_polynomial(Gamma,leaf)
+    fTilde = extension_polynomial(Gamma,leaf)
 
     # check whether the extended newton polyhedron is well defined
-    # if yes, use it to sprout Gamma at leaf
-    canSprout, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
-    if canSprout
+    # if yes, use it to extend Gamma at leaf
+    canExtend, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
+    if canExtend
         ui = uncertainty_variable(Gamma,depth(Gamma,leaf))
-        graft!(Gamma,leaf, elementary_root_tree(sigma,ui))
+        graft!(Gamma, leaf, elementary_root_tree(sigma,ui))
     end
-
-    return canSprout
+    return canExtend
 end
 
 # Input:
@@ -451,7 +410,7 @@ end
 #   - newInstances, a vector of length i, containing the i new root instances that split at "vertex"
 # Return: a new RootTree GammaNew, which is the sub-tree of Gamma with dummy root representing the parent of "vertex", such that the structure of the tree rooted at "vertex" has been entirely duplicated, consisting of i new copies
 
-function replicate_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:MPolyRingElem})
+function replicated_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:MPolyRingElem})
     # Necessary variables for initialising the new RootTree
     newSystem = MPolyRingElem[]
     newTree = Graph{Directed}(1)
@@ -477,6 +436,27 @@ function replicate_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:
     return RootTree(newSystem, newTree, newRoots, newPrecs)
 end
 
+# Input: 
+#   - Gamma, a rootTree
+#   - vertex, a vertex in Gamma
+# Return: The polynomial AT the depth of vertex, which has all the approximations above vertex substituted in, as well as x_i -> approximationAtVertex + x_i
+
+function reinforcement_polynomial(Gamma::RootTree, vertex::Int)
+    Kux = parent(system_polynomial(Gamma, 1))
+    Ku = base_ring(Kux)
+    i = depth(Gamma, vertex)-1
+    xi = gen(Kux, i)
+    rootBranch = branch(Gamma, vertex)
+    rootState = root(Gamma, vertex)
+    currentApproximation = length(coefficients(rootState))==1 ? zero(Ku) : last(collect(coefficients(rootState)))
+    if i==1 # Addresses the case where the root we are improving is of the first polynomial: not subject to any prior substitutions, or any constraints
+        prepPoly = evaluate(system_polynomial(Gamma, 1), vcat(Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-1))) # Substitutes in the already computed approximation in the variable we are working with
+    else
+        prepPoly = extension_polynomial(Gamma, rootBranch[end-1]) # This gives us f_i(z_1, ..., z_i-1, x_i)
+        prepPoly = evaluate(prepPoly, vcat(zeros(Kux, i-1), Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-i))) # This then substitutes x_i -> alreadyComputed + x_i, making this monomial ready for local_field_expansion.
+    end
+    return prepPoly
+end
 
 # Input:
 #   - Gamma, a RootTree
@@ -485,31 +465,19 @@ end
 # Note that, separate to this function, we need to manually update the increased precision of the root, through increase_precision!
 
 function improve_root!(Gamma::RootTree, vertex::Int)
-    Kux = parent(system_polynomial(Gamma, 1))
-    Ku = base_ring(Kux)
     rootToImprove = root(Gamma, vertex)
-    currentApproximation = collect(coefficients(rootToImprove))[end]
-    tailValuation = QQ(valuation(first(coefficients(rootToImprove))))
-    if length(collect(coefficients(rootToImprove)))==1 # This addresses the case where we do not have a currentApproximation to call, with only one coefficient associated to uncertainty
-        currentApproximation = zero(Ku)
-    end
+    Ku = parent(rootToImprove)
+    currentApproximation = length(coefficients(rootToImprove))==1 ? zero(Ku) : last(collect(coefficients(rootToImprove))) # This if-else statement simply accounts for the possibility that our rootToImprove has not had any calculation/improvement, in which case we must set this currentApproximation term to zero
+    tailValuation = QQ(valuation(first(coefficients(rootToImprove)))) # This gives us the valuation (minimum power in t) of the uncertainty term associated to the root
     rootBranch = branch(Gamma, vertex)
-    i = depth(Gamma, vertex)-1
-    xi = gen(Kux, i)
-    if i==1 #Addresses the case where the root we are improving is of the first polynomial in the triangular system: not subject to any constraints.
-        calcPoly = evaluate(system_polynomial(Gamma, 1), vcat(Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-1))) # Substitutes in the already computed
-        improvedRoots = local_field_expansion(calcPoly, tailValuation, prec(Gamma, vertex))
-    else
-        calcPoly = working_polynomial(Gamma, rootBranch[end-1]) #This gives us f_i(z_1, ..., z_i-1, x_i)
-        calcPoly = evaluate(calcPoly, vcat(zeros(Kux, i-1), Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-i))) # This then substitutes x_i -> alreadyComputed + x_i, making this monomial ready for local_field_expansion.
-        improvedRoots = local_field_expansion(calcPoly, tailValuation, precMax(Gamma))
-    end
+    prepPoly = reinforcement_polynomial(Gamma, vertex) # This is the polynomial whose root we are actually improving, and reinforcement_polynomial substitutes all previous roots in the triangular set, as well any current calculation we have done at rootToImprove itself
+    precStop = depth(Gamma, vertex)==2 ? prec(Gamma, vertex) : precMax(Gamma) # This if-else statement addresses the fact that if we are computing the first root in the branch, we have no constraints on our computation, and we must specify the exact precision to compute up to; if we are at any deeper point of the rootBranch, we compute the root until we no longer can (encountered uncertainty)
+    improvedRoots = local_field_expansion(prepPoly, tailValuation, precStop) # This carries out the calculation of our further computed roots, and this will replace what was previously in our "uncertainty tail"
+
     Gamma.roots[vertex] = currentApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
-    if length(improvedRoots)>1
-        # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point, using replicate_subtree
-        improvedRoots = [currentApproximation + Ku(improvedRoot) for improvedRoot in improvedRoots]
-        duplicateTree = replicate_subtree(Gamma, vertex, improvedRoots)
-        graft!(Gamma, rootBranch[end-1], duplicateTree)
+    if length(improvedRoots)>1 # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point, using replicate_subtree
+        newInstances = [currentApproximation + Ku(improvedRoot) for improvedRoot in improvedRoots[2:end]]
+        graft!(Gamma, rootBranch[end-1], replicated_subtree(Gamma, vertex, newInstances))
     end
     return true
 end
@@ -522,21 +490,16 @@ end
 function reinforce!(Gamma::RootTree, leaf::Int)
     GammaBranch = branch(Gamma,leaf) # Construct the branch ending in leaf
     popfirst!(GammaBranch) # remove the dummy vertex
-    # If precision used for leaf equals the current precision at the base of the branch, increase it
     precBase = prec(Gamma,GammaBranch[1])
-    if precBase==prec(Gamma,leaf)  # The case where our initial computation has already been carried through, and thus needs improvement
+    if precBase==prec(Gamma,leaf)  # If the precision at the base of the branch has been propagated all the way down to the leaf, we need to further compute the base root
         vertexToReinforce = GammaBranch[1]
-    else
+    else # Otherwise, we need to find the first root in the branch not to have fully used the computation at the base of the root
         i = findfirst(vertex->prec(Gamma,vertex)!=precBase, GammaBranch)
         vertexToReinforce = GammaBranch[i]
     end
     increase_precision!(Gamma, vertexToReinforce) #This simply updates the precision stored, and then improve_root! below actually carries out the computation to implement this new precision
     improve_root!(Gamma, vertexToReinforce)
     return true
-
-    # Suggestion: Just reinforce the first root in the branch of lower precision and return to main loop
-    # If the reinforced edge splits, the program flow can be messy, as `leaf` will be duplicated
-    # Arman {I agree with the above, and the improve_root! function is such that it will manufacture the duplicated sub-tree at that point, and will}
 end
 
 

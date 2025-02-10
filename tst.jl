@@ -15,7 +15,7 @@ println(tropical_variety_zerodimensional_triangular(triangularSystem, QQ(10)))
 ###
 # Example where increased precision in ~z1 is needed
 ###
-Kt,t = puiseux_series_field(algebraic_closure(QQ),100,"t")
+Kt,t = puiseux_series_field(QQ,100,"t")
 R,(x1,x2) = Kt["x1","x2"]
 triangularSystem = [x1-(1+t+t^2+t^3), x2-(x1-1-t)]
 println(tropical_variety_zerodimensional_triangular(triangularSystem, QQ(10)))

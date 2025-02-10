@@ -51,7 +51,7 @@ function root_calculation_conversion(f::AbstractAlgebra.Generic.MPoly{<:Abstract
     KtuX = parent(f)
     K = base_ring(base_ring(base_ring(KtuX)))
     activeVariableIndex = findfirst(!iszero, first(exponents(f)))
-    Kx, (x) = K[repr(gens(KtuX)[activeVariableIndex])]
+    Kx, (x) = K[repr(gen(KtuX, activeVariableIndex))]
     newPoly = zero(Kx)
     for (xExp, xCoeff) in zip(exponents(f), coefficients(f))
         for (uExp, uCoeff) in zip(exponents(xCoeff), coefficients(xCoeff))
@@ -78,6 +78,8 @@ function trop_univariate_conversion(f::AbstractAlgebra.Generic.MPoly{<:TropicalS
 end
 
 
+
+
 # In carrying out the recursive root expansion, this function also needs to account for various potential issues with having determined the roots in entirety, which will result in a vertexless tropical hypersurface... as well as accounting for whether our polynomial is insufficiently precise, which would result in a non-uniquely determined Newton polygon...
 function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, w::QQFieldElem, precision::QQFieldElem)
     Rx = parent(f)
@@ -86,30 +88,29 @@ function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebr
     activeVariableIndex = findfirst(!iszero, first(exponents(f))) #This will only ever break if fed a constant polynomial.
     x = gens(Rx)[activeVariableIndex] #This locates the actual variable in the multivariate ring being used: need to be careful in some case where this is not able to assign a variable (i.e. if the recursion polynomial is a constant)
     linkedImprecisionVariable = gens(Su)[activeVariableIndex]
-    w = Rational{Int64}(w) #This is for the use of powers.
+    w = Rational{Int64}(w) #This is for the use of powers with puiseux_series_field elements
     if w >= precision
         return [linkedImprecisionVariable*t^w]
     else
-        newRoots = Vector{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}()
-        h = zero_initial(evaluate(f, vcat(Rx.(zeros(activeVariableIndex-1)), x*t^w, Rx.(zeros(ngens(Rx)-activeVariableIndex)))), activeVariableIndex)
-        if u_presence_checker(h) #This is the case where our input polynomial is too imprecise to compute the next coefficient of the expansion.
-            push!(newRoots, linkedImprecisionVariable*t^w)
-            return newRoots
+        h = zero_initial(evaluate(f, vcat(zeros(Rx, activeVariableIndex-1), x*t^w, zeros(Rx, ngens(Rx)-activeVariableIndex))), activeVariableIndex)
+        if u_presence_checker(h) #This is the case where our input polynomial is too imprecise to compute the next coefficient of the expansion.)
+            return [linkedImprecisionVariable*t^w]
         end
         h = root_calculation_conversion(h)
+        newRoots = Vector{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}()
         for c in roots(h)
-            if iszero(c)
-                if iszero(evaluate(f, Rx.(zeros(ngens(Rx))))) #This is the case where we have one root which is finite, and agrees with another root in entirety up to this finite point (e.g roots t+3*t^2 and t + 3*t^2 + t^4, or even roots 0, 1 + 3*t^2+...)
+            if iszero(c)   
+                if iszero(evaluate(f, zeros(Rx, ngens(Rx)))) # This is the case where we have computed a finite root in entirety: but that it agrees with another root in entirety up to this finite point (e.g roots t+3*t^2 and t + 3*t^2 + t^4, or even roots 0, 1 + 3*t^2+...)
                     push!(newRoots, zero(Su))
-                end    
+                end
                 continue
             end
-            g = evaluate(f, vcat(Rx.(zeros(activeVariableIndex-1)), x+c*t^w, Rx.(zeros(ngens(Rx)-activeVariableIndex))))
+            g = evaluate(f, vcat(zeros(Rx, activeVariableIndex-1), x+c*t^w, zeros(Rx, ngens(Rx)-activeVariableIndex)))
             gTrop = trop_univariate_conversion(tropical_polynomial(g)) # roots of gTrop are the next exponents of the roots
-            nextExponents = [wNew[1] for wNew in vertices(tropical_hypersurface(gTrop)) if wNew[1]>w]
+            nextExponents = length(coefficients(gTrop))>1 ? [wNew[1] for wNew in vertices(tropical_hypersurface(gTrop)) if wNew[1]>w] : QQFieldElem[]
             if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
                 push!(newRoots, Su(c*t^w))
-                continue
+               continue
             end
             for nextExponent in nextExponents
                 for tailTerm in local_field_expansion(g,nextExponent,precision)
