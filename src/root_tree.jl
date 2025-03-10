@@ -51,7 +51,7 @@ end
 
 
 ###
-# ACCESSORS
+# Accessors
 ###
 import Oscar.roots
 system(Gamma::RootTree) = Gamma.system
@@ -173,13 +173,42 @@ function extension_polynomial(Gamma::RootTree, vertex::Int)
     return fTilde
 end
 
+# Input: 
+#   - Gamma, a rootTree
+#   - vertex, a vertex in Gamma
+# Return: The polynomial AT the depth of vertex, which has all the approximations above vertex substituted in, as well as x_i -> approximationAtVertex + x_i
+
 function reinforcement_polynomial(Gamma::RootTree, vertex::Int)
-    
+    Kux = parent(system_polynomial(Gamma, 1))
+    Ku = base_ring(Kux)
+    i = depth(Gamma, vertex)-1
+    xi = gen(Kux, i)
+    rootBranch = branch(Gamma, vertex)
+    rootState = root(Gamma, vertex)
+    certainApproximation = certain_approximation(Gamma, vertex)
+    if i==1 # Addresses the case where the root we are improving is of the first polynomial: not subject to any prior substitutions, or any constraints
+        prepPoly = evaluate(system_polynomial(Gamma, 1), vcat(Kux(certainApproximation)+xi, zeros(Kux, ngens(Kux)-1))) # Substitutes in the already computed approximation in the variable we are working with
+    else
+        prepPoly = extension_polynomial(Gamma, rootBranch[end-1]) # This gives us f_i(z_1, ..., z_i-1, x_i)
+        prepPoly = evaluate(prepPoly, vcat(zeros(Kux, i-1), Kux(certainApproximation)+xi, zeros(Kux, ngens(Kux)-i))) # This then substitutes x_i -> alreadyComputed + x_i, making this monomial ready for local_field_expansion.
+    end
+    return prepPoly
 end
 
-###
-# Geometric properties
-###
+function certain_approximation(Gamma::RootTree, vertex::Int)
+    rootToSplit = root(Gamma, vertex)
+    certainApproximation = last(collect(coefficients(rootToSplit)))
+    if length(collect(coefficients(rootToSplit)))==1
+        certainApproximation = zero(parent(rootToSplit))
+    end
+    return certainApproximation
+end
+
+function uncertain_valuation(Gamma::RootTree, vertex::Int)
+    rootToSplit = root(Gamma, vertex)
+    return QQ(valuation(first(coefficients(rootToSplit))))
+end
+
 
 # Input:
 # - Gamma, a RootTree
@@ -189,6 +218,10 @@ function root_valuation(Gamma::RootTree, vertex::Int)
     zTilde = root(Gamma,vertex)
     return minimum([valuation(c) for c in coefficients(zTilde)])
 end
+
+###
+# Geometric properties
+###
 
 
 ###
@@ -436,27 +469,7 @@ function replicated_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<
     return RootTree(newSystem, newTree, newRoots, newPrecs)
 end
 
-# Input: 
-#   - Gamma, a rootTree
-#   - vertex, a vertex in Gamma
-# Return: The polynomial AT the depth of vertex, which has all the approximations above vertex substituted in, as well as x_i -> approximationAtVertex + x_i
 
-function reinforcement_polynomial(Gamma::RootTree, vertex::Int)
-    Kux = parent(system_polynomial(Gamma, 1))
-    Ku = base_ring(Kux)
-    i = depth(Gamma, vertex)-1
-    xi = gen(Kux, i)
-    rootBranch = branch(Gamma, vertex)
-    rootState = root(Gamma, vertex)
-    currentApproximation = length(coefficients(rootState))==1 ? zero(Ku) : last(collect(coefficients(rootState)))
-    if i==1 # Addresses the case where the root we are improving is of the first polynomial: not subject to any prior substitutions, or any constraints
-        prepPoly = evaluate(system_polynomial(Gamma, 1), vcat(Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-1))) # Substitutes in the already computed approximation in the variable we are working with
-    else
-        prepPoly = extension_polynomial(Gamma, rootBranch[end-1]) # This gives us f_i(z_1, ..., z_i-1, x_i)
-        prepPoly = evaluate(prepPoly, vcat(zeros(Kux, i-1), Kux(currentApproximation)+xi, zeros(Kux, ngens(Kux)-i))) # This then substitutes x_i -> alreadyComputed + x_i, making this monomial ready for local_field_expansion.
-    end
-    return prepPoly
-end
 
 # Input:
 #   - Gamma, a RootTree
@@ -467,16 +480,16 @@ end
 function improve_root!(Gamma::RootTree, vertex::Int)
     rootToImprove = root(Gamma, vertex)
     Ku = parent(rootToImprove)
-    currentApproximation = length(coefficients(rootToImprove))==1 ? zero(Ku) : last(collect(coefficients(rootToImprove))) # This if-else statement simply accounts for the possibility that our rootToImprove has not had any calculation/improvement, in which case we must set this currentApproximation term to zero
-    tailValuation = QQ(valuation(first(coefficients(rootToImprove)))) # This gives us the valuation (minimum power in t) of the uncertainty term associated to the root
+    certainApproximation = certain_approximation(Gamma, vertex)
+    tailValuation = uncertain_valuation(Gamma, vertex)
     rootBranch = branch(Gamma, vertex)
     prepPoly = reinforcement_polynomial(Gamma, vertex) # This is the polynomial whose root we are actually improving, and reinforcement_polynomial substitutes all previous roots in the triangular set, as well any current calculation we have done at rootToImprove itself
     precStop = depth(Gamma, vertex)==2 ? prec(Gamma, vertex) : precMax(Gamma) # This if-else statement addresses the fact that if we are computing the first root in the branch, we have no constraints on our computation, and we must specify the exact precision to compute up to; if we are at any deeper point of the rootBranch, we compute the root until we no longer can (encountered uncertainty)
     improvedRoots = local_field_expansion(prepPoly, tailValuation, precStop) # This carries out the calculation of our further computed roots, and this will replace what was previously in our "uncertainty tail"
 
-    Gamma.roots[vertex] = currentApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
+    Gamma.roots[vertex] = certainApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
     if length(improvedRoots)>1 # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point, using replicate_subtree
-        newInstances = [currentApproximation + Ku(improvedRoot) for improvedRoot in improvedRoots[2:end]]
+        newInstances = [certainApproximation + Ku(improvedRoot) for improvedRoot in improvedRoots[2:end]]
         graft!(Gamma, rootBranch[end-1], replicated_subtree(Gamma, vertex, newInstances))
     end
     return true

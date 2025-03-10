@@ -1,7 +1,10 @@
-#This function facilitates the tropicalisation of a (multivariate) polynomial over an imprecision ring over the puiseux_series_field object.
+# Input:
+#   - A polynomial f over an 'imprecision' ring, over a puiseux_series_field
+#   - minOrMax, depending on tropicalisation
+# Return: The tropicalisation of the polynomial f, irrespective of whether the coefficients of f have imprecision.
 function tropical_polynomial(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}},minOrMax::Union{typeof(min),typeof(max)}=min)
     T = tropical_semiring(minOrMax)
-    Tx, x = polynomial_ring(T, [repr(x) for x in gens(parent(f))]) #Must define this using polynomial_ring, in order to have type MPoly, though still univariate, so that we can have functionality with tropical_hypersurface.
+    Tx, x = polynomial_ring(T, [repr(x) for x in gens(parent(f))]) 
     tropf = zero(Tx)
     for (xExp,xCoeff) in zip(exponents(f), coefficients(f))
         if !iszero(xCoeff)
@@ -15,7 +18,6 @@ function tropical_polynomial(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.
     end
     return tropf
 end
-
 
 
 #The following function finds the coefficient of the lowest t-degree term, a function of the x_i(s) and u_i's.
@@ -64,6 +66,11 @@ function root_calculation_conversion(f::AbstractAlgebra.Generic.MPoly{<:Abstract
 end
 
 
+# Input:
+#   - A polynomial f living in the tropical semiring
+# Return:
+#   - 
+
 #The following function places a univariate function, living in a multivariate ring, into a univariate ring, necessary for the tropical_hypersurface step
 function trop_univariate_conversion(f::AbstractAlgebra.Generic.MPoly{<:TropicalSemiringElem}, minOrMax::Union{typeof(min),typeof(max)}=min)
     T = tropical_semiring(minOrMax)
@@ -78,9 +85,10 @@ function trop_univariate_conversion(f::AbstractAlgebra.Generic.MPoly{<:TropicalS
 end
 
 
-
-
-# In carrying out the recursive root expansion, this function also needs to account for various potential issues with having determined the roots in entirety, which will result in a vertexless tropical hypersurface... as well as accounting for whether our polynomial is insufficiently precise, which would result in a non-uniquely determined Newton polygon...
+# Input:
+#   - 
+# Return:
+#   - 
 function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, w::QQFieldElem, precision::QQFieldElem)
     Rx = parent(f)
     Su = base_ring(parent(f))
@@ -100,22 +108,22 @@ function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebr
         newRoots = Vector{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}()
         for c in roots(h)
             if iszero(c)   
-                if iszero(evaluate(f, zeros(Rx, ngens(Rx)))) # This is the case where we have computed a finite root in entirety: but that it agrees with another root in entirety up to this finite point (e.g roots t+3*t^2 and t + 3*t^2 + t^4, or even roots 0, 1 + 3*t^2+...)
-                    push!(newRoots, zero(Su))
-                end
                 continue
             end
             g = evaluate(f, vcat(zeros(Rx, activeVariableIndex-1), x+c*t^w, zeros(Rx, ngens(Rx)-activeVariableIndex)))
             gTrop = trop_univariate_conversion(tropical_polynomial(g)) # roots of gTrop are the next exponents of the roots
             nextExponents = length(coefficients(gTrop))>1 ? [wNew[1] for wNew in vertices(tropical_hypersurface(gTrop)) if wNew[1]>w] : QQFieldElem[]
-            if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
+       #=     if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
                 push!(newRoots, Su(c*t^w))
                continue
-            end
+            end=#
             for nextExponent in nextExponents
                 for tailTerm in local_field_expansion(g,nextExponent,precision)
                     push!(newRoots, c*t^w + tailTerm)
                 end
+            end
+            if iszero(evaluate(g, zeros(Rx, ngens(Rx)))) # This is the case where we have computed a finite root in entirety: but that it agrees with another root in entirety up to this finite point (e.g roots t+3*t^2 and t + 3*t^2 + t^4, or even roots 0, 1 + 3*t^2+...)
+                push!(newRoots, Su(c*t^w))
             end
         end
         return newRoots
