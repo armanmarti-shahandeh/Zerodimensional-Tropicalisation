@@ -1,5 +1,3 @@
-
-
 ###
 # RootTree
 # ========
@@ -120,8 +118,8 @@ end
 
 # Input:
 #   - Gamma, a RootTree
-#   - vertex, a vertex of Gamma
-# Return: (b,GammaSprout)
+#   - vertex, a vertex of Gamma, not necessarily a leaf
+# Return:
 #   - all vertices on the branch of Gamma ending at vertex
 function branch(Gamma::RootTree, vertex::Int)
     return shortest_path_dijkstra(Gamma, 1, vertex)
@@ -173,18 +171,15 @@ function extension_polynomial(Gamma::RootTree, vertex::Int)
     return fTilde
 end
 
-# Input: 
+# Input:
 #   - Gamma, a rootTree
 #   - vertex, a vertex in Gamma
 # Return: The polynomial AT the depth of vertex, which has all the approximations above vertex substituted in, as well as x_i -> approximationAtVertex + x_i
-
 function reinforcement_polynomial(Gamma::RootTree, vertex::Int)
     Kux = parent(system_polynomial(Gamma, 1))
-    Ku = base_ring(Kux)
     i = depth(Gamma, vertex)-1
     xi = gen(Kux, i)
     rootBranch = branch(Gamma, vertex)
-    rootState = root(Gamma, vertex)
     certainApproximation = certain_approximation(Gamma, vertex)
     if i==1 # Addresses the case where the root we are improving is of the first polynomial: not subject to any prior substitutions, or any constraints
         prepPoly = evaluate(system_polynomial(Gamma, 1), vcat(Kux(certainApproximation)+xi, zeros(Kux, ngens(Kux)-1))) # Substitutes in the already computed approximation in the variable we are working with
@@ -327,9 +322,8 @@ function is_zerodimensional_triangular_set(triangularSystem::Vector{<:AbstractAl
 end
 
 # Input:
-# - sigma, an extended Newton polyhedron
-# - u, an uncertainty variable for the approximate roots
-# - prec, a precision value for the precisions
+# - sigma, an extended Newton polyhedron of a univariate polynomial
+# - u, an uncertainty variable to be used for the approximate roots
 # Output:
 # - the (expected) RootTree for sigma, depth one with one vertex for each root valuation of fTilde
 function elementary_root_tree(sigma::Polyhedron, u::MPolyRingElem)
@@ -442,7 +436,6 @@ end
 #   - vertex, a vertex in Gamma
 #   - newInstances, a vector of length i, containing the i new root instances that split at "vertex"
 # Return: a new RootTree GammaNew, which is the sub-tree of Gamma with dummy root representing the parent of "vertex", such that the structure of the tree rooted at "vertex" has been entirely duplicated, consisting of i new copies
-
 function replicated_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:MPolyRingElem})
     # Necessary variables for initialising the new RootTree
     newSystem = MPolyRingElem[]
@@ -476,7 +469,6 @@ end
 #   - a vertex in Gamma
 # Return: a boolean to record whether the root AT the given vertex has been improved (always true).
 # Note that, separate to this function, we need to manually update the increased precision of the root, through increase_precision!
-
 function improve_root!(Gamma::RootTree, vertex::Int)
     rootToImprove = root(Gamma, vertex)
     Ku = parent(rootToImprove)
