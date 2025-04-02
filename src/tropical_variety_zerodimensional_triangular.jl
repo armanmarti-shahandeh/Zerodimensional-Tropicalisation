@@ -1,7 +1,7 @@
-function tropical_variety_zerodimensional_Puiseux(I::MPolyIdeal, nu::TropicalSemiringMap; precision::Int=32)
+function tropical_variety_zerodimensional_tadic(I::MPolyIdeal, nu::TropicalSemiringMap; precision::Int=32)
     Sigma = Vector{QQFieldElem}[]
     for F in triangular_decomposition(I; algorithm=:lazard_factorized, ord=gens(base_ring(I)))
-        Sigma = vcat(Sigma, tropical_variety_zerodimensional_Puiseux_triangular(F, nu; precision=precision))
+        Sigma = vcat(Sigma, tropical_variety_zerodimensional_tadic_triangular(F, nu; precision=precision))
     end
     Sigma = unique(sort(Sigma))
     TropI = tropical_variety(polyhedral_complex(incidence_matrix([[i] for i in 1:length(Sigma)]),Sigma),
@@ -9,7 +9,7 @@ function tropical_variety_zerodimensional_Puiseux(I::MPolyIdeal, nu::TropicalSem
     return TropI
 end
 
-function tropical_variety_zerodimensional_Puiseux_triangular(I::MPolyIdeal, nu::TropicalSemiringMap; precision::Int=32)
+function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal, ::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
     F = [ f*lcm(denominator.(coefficients(f))) for f in gens(I) ]
 
     Ktx = base_ring(I)  # polynomial ring over a rational function field
@@ -23,31 +23,7 @@ function tropical_variety_zerodimensional_Puiseux_triangular(I::MPolyIdeal, nu::
     triangularSet = phi.(F)
 
     # Initialize book-keeping data
-    Gamma = root_tree(triangularSet, QQ(precision), QQ(4))
-
-    ###
-    # Main loop
-    ###
-    # iterationCounter = 0
-    while true
-        # for debugging purposes, aborts loop after specified number of iterations
-        # iterationCounter > 5 ? break : iterationCounter += 1
-        leaf = pick_ungrown_leaf(Gamma) # Pick a working leaf and abort loop if none exist
-        if leaf<0
-            break
-        end
-        extendSuccessful = extend!(Gamma,leaf)  # try extending the leaf
-        if !extendSuccessful
-            reinforce!(Gamma,leaf)     # try reinforcing the leaf
-        end
-    end
-    return tropical_points(Gamma)
-end
-
-function tropical_variety_zerodimensional_triangular(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, maxPrecision::QQFieldElem, precisionStep::QQFieldElem=QQ(1))
-
-    # Initialize book-keeping data
-    Gamma = root_tree(triangularSystem, maxPrecision, precisionStep)
+    Gamma = root_tree(triangularSet, QQ(precision), QQ(precisionStep))
 
     ###
     # Main loop
