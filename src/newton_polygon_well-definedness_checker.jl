@@ -2,7 +2,7 @@
 # Input: fTilde, a univariate polynomial inside a multivariate polynomial ring over the ring of Puiseux series with uncertainties
 # Return: (isWellDefined,sigma), where
 #  - isWellDefined, a boolean indicating whether the extended Newton polyhedron of fTilde is well-defined
-#  - sigma, the extended newton polyhedron of fTilde
+#  - sigma, if isWellDefine==true the extended newton polyhedron of fTilde
 ###
 function is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
     certainVals = QQFieldElem[]   # coefficient valuations that are certain
@@ -23,17 +23,20 @@ function is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde::Abst
         end
     end
 
-    # construct the lower convex hull of all terms with certain valuation
-    sigma = convex_hull(hcat(degsWithCertainVal,certainVals)) + polyhedron(positive_hull([0 1]))
-    if isempty(degsWithCertainVal) #This addresses the case where we are not even able to properly construct our Newton polytope (all coefficients have uncertainty)
-        return false,sigma
+    # if there are no degrees whose coefficient have certain valuation, return false
+    if isempty(degsWithCertainVal)
+        return false, polyhedron([[0]],[0])
     end
+
+    # construct the lower convex hull of all terms with certain valuation
+    sigma = convex_hull(hcat(degsWithCertainVal,certainVals), [0 1])
+
     for (v,d) in zip(uncertainVals,degsWithUncertainVal)
         # check whether the expected terms with uncertain valuation lie in the convex hull
         if !([d,v] in sigma)
-            return false,sigma
+            return false, polyhedron([[0]],[0])
         end
     end
 
-    return true,sigma
+    return true, sigma
 end
