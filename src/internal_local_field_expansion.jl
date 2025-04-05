@@ -2,22 +2,19 @@
 #   - A polynomial f over an 'imprecision' ring, over a puiseux_series_field
 #   - minOrMax, depending on tropicalisation
 # Return: The tropicalisation of the polynomial f, irrespective of whether the coefficients of f have imprecision.
-function tropical_polynomial(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}},minOrMax::Union{typeof(min),typeof(max)}=min)
-    T = tropical_semiring(minOrMax)
-    Tx, x = polynomial_ring(T, [repr(x) for x in gens(parent(f))]) 
-    tropf = zero(Tx)
-    for (xExp,xCoeff) in zip(exponents(f), coefficients(f))
-        if !iszero(xCoeff)
-            lowestDegreeOft = minimum([valuation(c) for c in coefficients(xCoeff)])
-            monomial = T(lowestDegreeOft)
-            for (i,exp) in enumerate(xExp)
-                monomial *= x[i]^(exp)
-            end
-            tropf += monomial
+
+
+
+#This function complements the above zero_initial, as we will not be able to compute the next coefficient of the expansion if we have an uncertainty u_i in our lowest degree term, so the recursion polynomial is too imprecise.
+function u_presence_checker(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
+    for xCoeff in coefficients(f)
+        if findall(!iszero, collect(exponents(xCoeff)))!=[]
+            return true
         end
     end
-    return tropf
+    return false
 end
+
 
 
 #The following function finds the coefficient of the lowest t-degree term, a function of the x_i(s) and u_i's.
@@ -38,15 +35,6 @@ function zero_initial(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic
     return minimaltDegreeCoefficient
 end
 
-#This function complements the above zero_initial, as we will not be able to compute the next coefficient of the expansion if we have an uncertainty u_i in our lowest degree term, so the recursion polynomial is too imprecise.
-function u_presence_checker(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
-    for xCoeff in coefficients(f)
-        if findall(!iszero, collect(exponents(xCoeff)))!=[]
-            return true
-        end
-    end
-    return false
-end
 
 #This function simply takes a polynomial which lives in the multivariate ring, over the imprecision ring, but we know to be univariate and not involving imprecision, so we transform into a polynomial living in a univariate ring over the base field, in order to carry out root calculations.
 function root_calculation_conversion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
@@ -66,23 +54,6 @@ function root_calculation_conversion(f::AbstractAlgebra.Generic.MPoly{<:Abstract
 end
 
 
-# Input:
-#   - A polynomial f living in the tropical semiring
-# Return:
-#   - 
-
-#The following function places a univariate function, living in a multivariate ring, into a univariate ring, necessary for the tropical_hypersurface step
-function trop_univariate_conversion(f::AbstractAlgebra.Generic.MPoly{<:TropicalSemiringElem}, minOrMax::Union{typeof(min),typeof(max)}=min)
-    T = tropical_semiring(minOrMax)
-    activeVariableIndex = findfirst(!iszero, first(exponents(f)))
-    activeVariable = gens(parent(f))[activeVariableIndex]
-    Tx, x = polynomial_ring(T, [repr(activeVariable)])
-    uniPoly = zero(Tx)
-    for (xExp, xCoeff) in zip(exponents(f), coefficients(f))
-        uniPoly += xCoeff*x[1]^(xExp[activeVariableIndex])
-    end
-    return uniPoly
-end
 
 
 # Input:
@@ -101,7 +72,7 @@ function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebr
         return [linkedImprecisionVariable*t^w]
     else
         h = zero_initial(evaluate(f, vcat(zeros(Rx, activeVariableIndex-1), x*t^w, zeros(Rx, ngens(Rx)-activeVariableIndex))), activeVariableIndex)
-        if u_presence_checker(h) #This is the case where our input polynomial is too imprecise to compute the next coefficient of the expansion.)
+        if u_presence_checker(h) # This is the case where our input polynomial is too imprecise to compute the next coefficient of the expansion.
             return [linkedImprecisionVariable*t^w]
         end
         h = root_calculation_conversion(h)
@@ -111,11 +82,15 @@ function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebr
                 continue
             end
             g = evaluate(f, vcat(zeros(Rx, activeVariableIndex-1), x+c*t^w, zeros(Rx, ngens(Rx)-activeVariableIndex)))
-            gTrop = trop_univariate_conversion(tropical_polynomial(g)) # roots of gTrop are the next exponents of the roots
-            nextExponents = length(coefficients(gTrop))>1 ? [wNew[1] for wNew in vertices(tropical_hypersurface(gTrop)) if wNew[1]>w] : QQFieldElem[]
-       #=     if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
+            canComputeNextValuation, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(g)
+            if !canComputeNextValuation  # This is the case where we have u_i's present in our Newton polygon vertices, so we cannot compute the valuation of the next term of our root
+                push!(newRoots, linkedImprecisionVariable*t^w)
+                continue
+            end
+            nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
+     #=     if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
                 push!(newRoots, Su(c*t^w))
-               continue
+                continue
             end=#
             for nextExponent in nextExponents
                 for tailTerm in local_field_expansion(g,nextExponent,precision)

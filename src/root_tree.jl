@@ -519,7 +519,10 @@ function tropical_points(Gamma::RootTree)
     GammaTrop = Vector{QQFieldElem}[]
     for GammaLeaf in GammaLeaves
         GammaBranch = branch(Gamma,GammaLeaf)
-        push!(GammaTrop, root_valuation.(Ref(Gamma),GammaBranch[2:end]))
+        tropicalRoot = root_valuation.(Ref(Gamma), GammaBranch[2:end])
+        if !(tropicalRoot in GammaTrop)
+            push!(GammaTrop, tropicalRoot)
+        end
     end
     return GammaTrop
 end
