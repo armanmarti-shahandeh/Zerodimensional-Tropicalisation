@@ -84,7 +84,9 @@ function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebr
             g = evaluate(f, vcat(zeros(Rx, activeVariableIndex-1), x+c*t^w, zeros(Rx, ngens(Rx)-activeVariableIndex)))
             canComputeNextValuation, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(g)
             if !canComputeNextValuation  # This is the case where we have u_i's present in our Newton polygon vertices, so we cannot compute the valuation of the next term of our root
-                push!(newRoots, linkedImprecisionVariable*t^w)
+                if !(linkedImprecisionVariable*t^w in newRoots)
+                    push!(newRoots, linkedImprecisionVariable*t^w)
+                end
                 continue
             end
             nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
@@ -97,7 +99,7 @@ function local_field_expansion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebr
                     push!(newRoots, c*t^w + tailTerm)
                 end
             end
-            if iszero(evaluate(g, zeros(Rx, ngens(Rx)))) # This is the case where we have computed a finite root in entirety: but that it agrees with another root in entirety up to this finite point (e.g roots t+3*t^2 and t + 3*t^2 + t^4, or even roots 0, 1 + 3*t^2+...)
+            if iszero(evaluate(g, zeros(Rx, ngens(Rx)))) # This is the case where we have computed a finite root in entirety.
                 push!(newRoots, Su(c*t^w))
             end
         end
