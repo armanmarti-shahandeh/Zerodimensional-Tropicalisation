@@ -5,7 +5,7 @@
 
 
 
-#This function complements the above zero_initial, as we will not be able to compute the next coefficient of the expansion if we have an uncertainty u_i in our lowest degree term, so the recursion polynomial is too imprecise.
+# This function complements the above zero_initial, as we will not be able to compute the next coefficient of the expansion if we have an uncertainty u_i in our lowest degree term, so the recursion polynomial is too imprecise.
 function u_presence_checker(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
     for xCoeff in coefficients(f)
         if findall(!iszero, collect(exponents(xCoeff)))!=[]
@@ -17,7 +17,7 @@ end
 
 
 
-#The following function finds the coefficient of the lowest t-degree term, a function of the x_i(s) and u_i's.
+# The following function finds the coefficient of the lowest t-degree term, a function of the x_i(s) and u_i's.
 function zero_initial(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}, VariableIndex::Int)
     minimaltDegree = minimum([minimum(valuation.(coefficients(xCoeff))) for xCoeff in coefficients(f)])
     minimaltDegreeCoefficient = zero(parent(f))
@@ -36,7 +36,7 @@ function zero_initial(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic
 end
 
 
-#This function simply takes a polynomial which lives in the multivariate ring, over the imprecision ring, but we know to be univariate and not involving imprecision, so we transform into a polynomial living in a univariate ring over the base field, in order to carry out root calculations.
+# This function simply takes a polynomial which lives in the multivariate ring, over the imprecision ring, but we know to be univariate and not involving imprecision, so we transform into a polynomial living in a univariate ring over the base field, in order to carry out root calculations.
 function root_calculation_conversion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
     KtuX = parent(f)
     K = base_ring(base_ring(base_ring(KtuX)))
