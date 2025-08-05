@@ -9,6 +9,18 @@ function tropical_variety_zerodimensional_tadic(I::MPolyIdeal, nu::TropicalSemir
     return TropI
 end
 
+# check whether the polynomials in F are lower triangular,
+# i.e., F[1] is a polynomial in x1, F[2] is a polynomial in x1 and x2, etc.
+function is_lower_triangular(F::Vector{<:MPolyRingElem})
+    for (i,f) in enumerate(F)
+        # sum all exponent vectors and check that entries after i are zero
+        if any(!iszero,sum(exponents(f))[i+1:end])
+            return false
+        end
+    end
+    return true
+end
+
 function clear_denominators_and_convert_from_rational_functions_to_puiseux_series(F::Vector; precision::Int=32)
     F = [ f*lcm(denominator.(coefficients(f))) for f in F ] # clear denominators
     Ktx = parent(first(F))     # polynomial ring over a rational function field
@@ -24,8 +36,17 @@ function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal, ::Trop
     # convert to Puiseux series
     triangularSet = clear_denominators_and_convert_from_rational_functions_to_puiseux_series(gens(I),precision=precision)
 
+    if get_assertion_level(:ZerodimensionalTropicalization) > 0
+        @req is_lower_triangular(triangularSet) "The input polynomials must be lower triangular."
+    end
+
     # initialize book-keeping data
     Gamma = root_tree(triangularSet, QQ(precision), QQ(precisionStep))
+
+    if get_verbosity_level(:ZerodimensionalTropicalization) > 0
+        println("Starting root tree:")
+        println(Gamma)
+    end
 
     ###
     # Main loop
@@ -35,9 +56,13 @@ function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal, ::Trop
         if leaf<0
             break
         end
-        extendSuccessful = extend!(Gamma,leaf)  # try extending the leaf
+        extendSuccessful = extend!(Gamma,leaf) # try extending the leaf
         if !extendSuccessful
-            reinforce!(Gamma,leaf)     # try reinforcing the leaf
+            reinforce!(Gamma,leaf) # try reinforcing the leaf
+        end
+        if get_verbosity_level(:ZerodimensionalTropicalization) > 0
+            println("Updated root tree:")
+            println(Gamma)
         end
     end
     return tropical_points(Gamma)

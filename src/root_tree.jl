@@ -477,6 +477,18 @@ function improve_root!(Gamma::RootTree, vertex::Int)
     rootBranch = branch(Gamma, vertex)
     prepPoly = reinforcement_polynomial(Gamma, vertex) # This is the polynomial whose root we are actually improving, and reinforcement_polynomial substitutes all previous roots in the triangular set, as well any current calculation we have done at rootToImprove itself
     precStop = depth(Gamma, vertex)==2 ? prec(Gamma, vertex) : precMax(Gamma) # This if-else statement addresses the fact that if we are computing the first root in the branch, we have no constraints on our computation, and we must specify the exact precision to compute up to; if we are at any deeper point of the rootBranch, we compute the root until we no longer can (encountered uncertainty)
+
+    if get_verbosity_level(:ZerodimensionalTropicalizationImproveRoot) > 0
+        println("improve_root! called with:")
+        println("Gamma ", Gamma)
+        println("vertex ", vertex)
+        println("data:")
+        println("rootToImprove ", rootToImprove)
+        println("certainApproximation ", certainApproximation)
+        println("precStop ", precStop)
+        println("prepPoly ",prepPoly)
+        println("tailValuation ", tailValuation)
+    end
     improvedRoots = local_field_expansion(prepPoly, tailValuation, precStop) # This carries out the calculation of our further computed roots, and this will replace what was previously in our "uncertainty tail"
 
     Gamma.roots[vertex] = certainApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
