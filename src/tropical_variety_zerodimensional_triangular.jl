@@ -11,9 +11,9 @@ end
 
 function clear_denominators_and_convert_from_rational_functions_to_puiseux_series(F::Vector; precision::Int=32)
     F = [ f*lcm(denominator.(coefficients(f))) for f in F ] # clear denominators
-    Ktx = base_ring(I)  # polynomial ring over a rational function field
-    Kt = base_ring(Ktx) # rational function field
-    K = base_ring(Kt)   # coefficient field of rational functions
+    Ktx = parent(first(F))     # polynomial ring over a rational function field
+    Kt = coefficient_ring(Ktx) # rational function field
+    K = base_ring(Kt)          # coefficient field of rational functions
     KK = algebraic_closure(K)
     KKt,t = puiseux_series_field(KK,precision,:t)
     KKtx,x = polynomial_ring(KKt,symbols(Ktx))
