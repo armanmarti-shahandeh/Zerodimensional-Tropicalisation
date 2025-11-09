@@ -1,4 +1,5 @@
-###
+################################################################################
+#
 # RootTree
 # ========
 # RootTree is an internal struct for tropicalizing zerodimensional triangular systems.  It consists of
@@ -27,23 +28,25 @@
 #  - roots + precs: [TODO: fill details here]
 # Note: k=1 means we have increased precision for roots[i_1] and updated roots[i_2],...,roots[i_l] accordingly
 #  k>1 means we have updated roots[i_k],...,roots[i_l] using existing roots[i_1], ..., roots[i_{k-1}]
-###
+################################################################################
 mutable struct RootTree
     system::Vector{<:MPolyRingElem}
+    nu::TropicalSemiringMap
     tree::Graph{Directed}
     roots::Vector{<:MPolyRingElem}
     precs::Vector{QQFieldElem}
     precMax::QQFieldElem
     precStep::QQFieldElem
 
-    # setting default values for each field
-    function RootTree(system::Vector{<:MPolyRingElem}=MPolyRingElem[],
+    # setting default values for some fields
+    function RootTree(system::Vector{<:MPolyRingElem},
+                      nu::TropicalSemiringMap,
                       tree::Graph{Directed}=Graph{Directed}(0),
                       roots::Vector{<:MPolyRingElem}=MPolyRingElem[],
                       precs::Vector{QQFieldElem}=QQFieldElem[0],
                       precMax::QQFieldElem=QQ(0),
                       precStep::QQFieldElem=QQ(1))
-        return new(system, tree, roots, precs, precMax, precStep)
+        return new(system, nu, tree, roots, precs, precMax, precStep)
     end
 end
 
@@ -51,7 +54,6 @@ end
 ###
 # Accessors
 ###
-import Oscar.roots
 system(Gamma::RootTree) = Gamma.system
 tree(Gamma::RootTree) = Gamma.tree
 roots(Gamma::RootTree) = Gamma.roots
@@ -67,22 +69,12 @@ precStep(Gamma::RootTree) = Gamma.precStep
 ###
 # Combinatorial properties
 ###
-import Oscar.n_vertices
-import Oscar.nv
-import Oscar.n_edges
-import Oscar.ne
-import Oscar.edges
-import Oscar.degree
-import Oscar.shortest_path_dijkstra
 n_vertices(Gamma::RootTree) = n_vertices(tree(Gamma))
-nv(Gamma::RootTree) = nv(tree(Gamma))
 n_edges(Gamma::RootTree) = n_edges(tree(Gamma))
-ne(Gamma::RootTree) = ne(tree(Gamma))
 edges(Gamma::RootTree) = edges(tree(Gamma))
 degree(Gamma::RootTree, vertex::Int) = degree(tree(Gamma), vertex)
 shortest_path_dijkstra(Gamma::RootTree, src::Int, dst::Int) = shortest_path_dijkstra(tree(Gamma), src, dst)
 
-import Oscar.depth
 function depth(Gamma::RootTree, vertex::Int)
     return length(shortest_path_dijkstra(Gamma, 1, vertex))
 end
@@ -93,10 +85,12 @@ function leaves(Gamma::RootTree)
     return [vertex for vertex in 1:n_vertices(Gamma) if degree(Gamma, vertex)==0]
 end
 
-# Input:
-# - Gamma, a RootTree
-# - vertex, a vertex of Gamma
-# Return: all vertices of Gamma below vertex
+
+@doc raw"""
+    descendants(Gamma::RootTree, vertex::Int)
+
+Return all vertices of `Gamma` below `vertex`.
+"""
 function descendants(Gamma::RootTree, vertex::Int)
     # Create dictionary of children
     children = Dict{Int, Vector{Int}}()
@@ -116,11 +110,12 @@ function descendants(Gamma::RootTree, vertex::Int)
     return verticesBelow
 end
 
-# Input:
-#   - Gamma, a RootTree
-#   - vertex, a vertex of Gamma, not necessarily a leaf
-# Return:
-#   - all vertices on the branch of Gamma ending at vertex
+
+@doc raw"""
+    branch(Gamma::RootTree, vertex::Int)
+
+Return all vertices on branch of `Gamma` ending at `vertex`.
+"""
 function branch(Gamma::RootTree, vertex::Int)
     return shortest_path_dijkstra(Gamma, 1, vertex)
 end
@@ -130,24 +125,30 @@ end
 # Algebraic properties
 ###
 
-# Input: RootTree
-# Return: the variables representing uncertainty
+@doc raw"""
+    uncertainty_variables(Gamma::RootTree)
+
+Return all uncertainty variables of `Gamma`.
+"""
 function uncertainty_variables(Gamma::RootTree)
     return gens(base_ring(parent(first(system(Gamma)))))
 end
 
-# Input:
-# - Gamma, a RootTree
-# - i, a variable index
-# Return: the variable representing uncertainty in the i-th variable
+@doc raw"""
+    uncertainty_variable(Gamma::RootTree, i::Int)
+
+Return the `i`-th uncertainty variable of `Gamma`.
+"""
 function uncertainty_variable(Gamma::RootTree, i::Int)
     return gen(base_ring(parent(first(system(Gamma)))),i)
 end
 
-# Input:
-# - Gamma, a RootTree
-# - i, a variable index
-# Return: the i-th polynomial in system(Gamma)
+@doc raw"""
+    system_polynomial(Gamma::RootTree, i::Int)
+
+Return the `i`-th polynomial in the triangular system of `Gamma`, i.e., the
+polynomial containing the first `i` variables.
+"""
 function system_polynomial(Gamma::RootTree, i::Int)
     return system(Gamma)[i]
 end
@@ -222,8 +223,6 @@ end
 ###
 # Mutators
 ###
-import Oscar.rem_vertex!
-import Oscar.rem_vertices!
 function rem_vertex!(Gamma::RootTree, vertex::Int)
     # for the sake of consistency with rem_vertex!(::Graph)
     # return Boolean indicating whether vertex was removed
@@ -286,25 +285,47 @@ end
 # Constructors
 ###
 
-# trivial constructor
-function root_tree()
-    return RootTree()
-end
+@doc raw"""
+    root_tree(triangularSystem::Vector{<:MPolyRingElem}, nu::TropicalSemiringMap, precMax::QQFieldElem=QQ(0), precStep::QQFieldElem=QQ(1))
 
-# Input:
-# - triangularSystem, a zerodimensional triangular set over a Puiseux series field
-# - maxPrecision, a maximum precision as a safeguard for infinite loops
-# Output:
-# - the initial RootTree for triangularSystem, consisting only of a single root vertex, no edges, and no actual roots
-function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}},precMax::QQFieldElem=QQ(0),precStep::QQFieldElem=QQ(1))
-    @req is_zerodimensional_triangular_set(triangularSystem) "Input must be a zerodimensional triangular set."
+Initialize and return a root tree to tropicalize `triangularSystem` with respect to `nu`.  `precMax` is the maximum relative precision to be used, `precStep` is the step size for increasing precision.
+
+# Examples
+```jldoctest
+julia> K = algebraic_closure(QQ);
+
+julia> Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> nu = tropical_semiring_map(Kt,t);
+
+julia> R,(x1,x2) = Kt[:x1,:x2];
+
+julia> F = [t+x1+x1^2, x1+x2+x2^2];
+
+julia> root_tree(F, nu)
+root tree of the triangular system
+ {a1: 1.00000}*x1^2 + {a1: 1.00000}*x1 + t
+ {a1: 1.00000}*x1 + {a1: 1.00000}*x2^2 + {a1: 1.00000}*x2
+with edges Edge[]
+with precisions and roots
+ 1: (0) 0
+
+```
+"""
+function root_tree(triangularSystem::Vector{<:MPolyRingElem}, nu::TropicalSemiringMap, precMax::QQFieldElem=QQ(0), precStep::QQFieldElem=QQ(1))
+    @req is_zerodimensional_triangular_set(triangularSystem) "polynomials must be a zerodimensional triangular set."
+    @req !is_trivial(nu) "tropical semiring map must be non-trivial."
+    @req coefficient_ring(first(triangularSystem)) == domain(nu) "coefficient ring of polynomials must match domain of tropical semiring map."
+    @req precMax >= QQ(0) "maximum precision must be non-negative."
+    @req precStep > QQ(0) "precision step must be positive."
 
     # Add uncertainty variables to the ambient ring of triangularSystem
     Kx = parent(first(triangularSystem))
+    n = ngens(Kx)
     K = base_ring(Kx)
-    Ku, _ = polynomial_ring(K, ["u$i" for i in 1:ngens(Kx)])
+    Ku, _ = polynomial_ring(K, :u=>1:n)
     Kux, _ = polynomial_ring(Ku, symbols(Kx))
-    phi = hom(Kx,Kux,c->Ku(c),gens(Kux))
+    phi = hom(Kx, Kux, c->Ku(c), gens(Kux))
     system = phi.(triangularSystem)
 
     # Initialize the rest
@@ -312,13 +333,28 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
     roots = zeros(Ku,1)
     precs = QQFieldElem[precMax]
 
-    return RootTree(system, tree, roots, precs, precMax, precStep)
+    return RootTree(system, nu, tree, roots, precs, precMax, precStep)
 end
 
 # tests whether input is a zero-dimensional triangular set
-# TODO: make the test more sensible
-function is_zerodimensional_triangular_set(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
-    return length(triangularSystem) == ngens(parent(first(triangularSystem)))
+function is_zerodimensional_triangular_set(triangularSystem::Vector{<:MPolyRingElem})
+    R = parent(first(triangularSystem))
+    n = ngens(R)
+
+    # check that triangularSystem is of correct length
+    if n != length(triangularSystem)
+        return false
+    end
+
+    # check that i-th entry only contains variables 1 to i
+    for (i,fi) in enumerate(triangularSystem)
+        alpha = sum(exponents(fi))
+        if any(!iszero, alpha[i+1:n])
+            return false
+        end
+    end
+
+    return true
 end
 
 # Input:
@@ -327,9 +363,9 @@ end
 # Output:
 # - the (expected) RootTree for sigma, depth one with one vertex for each root valuation of fTilde
 function elementary_root_tree(sigma::Polyhedron, u::MPolyRingElem)
-    # compute a list of negated slopes of sigma
-    # - v[2]<0 filters out the two non-lower slopes
-    # - v[1]/v[2] is the negated slope as v is an outer normal vector
+    # compute a list of negated slopes of sigma from the outer normal vectors `v`
+    # - v[2]<0 means a non-vertical facet
+    # - v[1]/v[2] is the negated slope
     negatedSlopes = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 ]
 
     # construct the RootTree
@@ -360,7 +396,6 @@ end
 # TODO: this should probably be display, but I don't know how to overload it.  The following did not work:
 # import Base.display
 # function display(io::IO, Gamma::RootTree)
-import Base.show
 function Base.show(io::IO, Gamma::RootTree)
     if iszero(n_vertices(tree(Gamma)))
         println(io, "empty root tree")
@@ -381,7 +416,6 @@ end
 ###
 # Visualization
 ###
-import Oscar.visualize
 function visualize(Gamma::RootTree)
     visualize(tree(Gamma))
 end

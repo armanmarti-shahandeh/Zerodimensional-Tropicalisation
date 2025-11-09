@@ -1,52 +1,16 @@
-using Revise
-using OscarZerodimensionalTropicalization
 using OscarPuiseuxPolynomial
 using Oscar
-
-K = algebraic_closure(QQ);
-Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
-Ktu,(u1,u2,u3) = polynomial_ring(Kt,[:u1,:u2,:u3]);
-Ktux,(x1,x2,x3) = polynomial_ring(Ktu,[:x1,:x2,:x3]);
-
-f1Tilde = t + 2*x1 + 2*x1^2;
-initial_zero(f1Tilde)
-
-
-puiseux_expansion(f1Tilde, QQ(1), QQ(3))
-f2Tilde = (t+u1*t^2) + x2 + x2^2;
-
+include("src/zerodimensionalTropicalization.jl")
 
 
 ###
 # Example with uniquely determined tropicalization
-# Trop(F)= {(0,0), (1,0), (1,1)}
 ###
-K = algebraic_closure(QQ);
-Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
-nu = tropical_semiring_map(Kt,t);
-R,(x1,x2) = Kt[:x1,:x2];
-F = [t+x1+x1^2, x1+x2+x2^2];
-root_tree(F, nu)
-
-
-
-
-###
-#
-###
-K = algebraic_closure(QQ);
-Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
-S,(u1,u2) = Kt[:u1, :u2];
-R,(x1,x2,x3) = S[:x1,:x2,:x3];
-
-fTilde = (t+(u1+u2)*t^2) + (1+u1*t+u2*t^2)*x3 + u1*x3^2;
-b, sigma = is_newton_polygon_well_defined_with_polygon(fTilde) # true
-facets(sigma) # 2 vertical, 1 with slope -1, 1 with slope 0
-
-fTilde = ((u1+u2)*t+t^2) + (1+u1*t+u2*t^2)*x3 + u1*x3^2;
-b, sigma = is_newton_polygon_well_defined_with_polygon(fTilde) # false
-
-
+Kt,t = rational_function_field(QQ,"t");
+nu = tropical_semiring_map(Kt,t)
+R,(x1,x2,x3) = Kt["x1","x2","x3"];
+I = ideal([t*x1^2+x1+1, t*x2^2+x1*x2+1, x3+x1*x2])
+println(tropical_variety_zerodimensional_tadic_triangular(I, nu, precision=10) == Vector{QQFieldElem}[[-1, -2, -3], [-1, 1, 0], [0, -1, -1], [0, 0, 0]])
 
 ###
 # Example where increased precision in ~z1 is needed

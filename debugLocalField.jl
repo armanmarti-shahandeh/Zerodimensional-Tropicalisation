@@ -2,7 +2,7 @@ using Oscar
 include("src/internal_local_field_expansion.jl")
 
 
-Kt, t = puiseux_series_field(algebraic_closure(QQ), 100, "t")
+Kt, t = puiseux_series_field(algebraic_closure(QQ), 10, "t")
 Ku, (u1,u2,u3,u4) = Kt["u1","u2","u3","u4"]
 Kux, (x1,x2,x3,x4) = Ku["x1","x2","x3","x4"]
 
