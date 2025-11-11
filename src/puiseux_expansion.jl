@@ -1,20 +1,42 @@
 ################################################################################
+#
 # Puiseux expansions (of univariate polynomials over uncertainty rings)
 #
 ###############################################################################
 
 
-# Input:
-#   - A polynomial f over an 'imprecision' ring, over a puiseux_series_field
-#   - minOrMax, depending on tropicalisation
-# Return: The tropicalisation of the polynomial f, irrespective of whether the coefficients of f have imprecision.
+@doc raw"""
+    has_non_constant_coefficients(fTilde::MPolyRingElem{<:MPolyRingElem})
 
+Given a polynomial `fTilde` in $K[u_1,...,u_n][x_1,...,x_n]$, return `true` if
+`fTilde` has coefficients in $K[u_1,...,u_n]\setminus K$.  Return `false` if all
+coefficients lie in $K$.
 
+# Examples
+```jldoctest
+julia> K = algebraic_closure(QQ);
 
-# This function complements the above zero_initial, as we will not be able to compute the next coefficient of the expansion if we have an uncertainty u_i in our lowest degree term, so the recursion polynomial is too imprecise.
-function u_presence_checker(f::MPolyRingElem{<:MPolyRingElem})
-    for xCoeff in coefficients(f)
-        if findall(!iszero, collect(exponents(xCoeff)))!=[]
+julia> Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> Ktu,(u1,u2,u3) = polynomial_ring(Kt,[:u1,:u2,:u3]);
+
+julia> Ktux,(x1,x2,x3) = polynomial_ring(Ktu,[:x1,:x2,:x3]);
+
+julia> f1Tilde = t + 2*x1 + 2*x1^2; # coefficients constant
+
+julia> has_non_constant_coefficients(f1Tilde)
+false
+
+julia> f2Tilde = (t+u1*t^2) + x2 + x2^2; # coefficients contain u
+
+julia> has_non_constant_coefficients(f2Tilde)
+true
+
+```
+"""
+function has_non_constant_coefficients(fTilde::MPolyRingElem{<:MPolyRingElem})
+    for xCoeff in coefficients(fTilde)
+        if any(!iszero, exponents(xCoeff))
             return true
         end
     end
@@ -23,21 +45,48 @@ end
 
 
 
-# The following function finds the coefficient of the lowest t-degree term, a function of the x_i(s) and u_i's.
-function initial_zero(f::MPolyRingElem{<:MPolyRingElem})
+@doc raw"""
+    initial_zero(fTilde::MPolyRingElem{<:MPolyRingElem})
+
+Given a polynomial `fTilde` in $K[u_1,...,u_n][x_1,...,x_n]$, return the initial
+of `fTilde` with respect to weight vector `0`.
+
+# Examples
+```jldoctest
+julia> K = algebraic_closure(QQ);
+
+julia> Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> Ktu,(u1,u2,u3) = polynomial_ring(Kt,[:u1,:u2,:u3]);
+
+julia> Ktux,(x1,x2,x3) = polynomial_ring(Ktu,[:x1,:x2,:x3]);
+
+julia> f1Tilde = t + 2*x1 + 2*x1^2;
+
+julia> initial_zero(f1Tilde) # no constant term as it had valuation 1
+{a1: 2.00000}*x1^2 + {a1: 2.00000}*x1
+
+julia> f2Tilde = (1+t+u1*t^2) + x2 + x2^2; # higher order terms are dropped
+
+julia> initial_zero(f2Tilde)
+{a1: 1.00000}*x2^2 + {a1: 1.00000}*x2 + {a1: 1.00000}
+
+```
+"""
+function initial_zero(fTilde::MPolyRingElem{<:MPolyRingElem})
     # iterate over all x-coefficients (polynomials in u),
     # iterate over all u-coefficients (puiseux polynomials),
     # and record all valuations found. find the minimal one
-    allVals = [ valuation.(coefficients(xCoeff)) for xCoeff in coefficients(f) ]
+    allVals = [ valuation.(coefficients(xCoeff)) for xCoeff in coefficients(fTilde) ]
     minVal = minimum(Iterators.flatten(allVals))
 
     # return sum over all monomials of lowest valuation,
     # replacing the puiseux polynomial coefficients by their initial
-    Ktux = parent(f)
+    Ktux = parent(fTilde)
     Ktu = base_ring(Ktux)
     Kt = base_ring(Ktu)
     zeroInitial = zero(Ktux)
-    for (xMon, xCoeff, xCoeffVals) in zip(monomials(f), coefficients(f), allVals)
+    for (xMon, xCoeff, xCoeffVals) in zip(monomials(fTilde), coefficients(fTilde), allVals)
         for (uMon, uCoeff, uCoeffVal) in zip(monomials(xCoeff), coefficients(xCoeff), xCoeffVals)
             if uCoeffVal == minVal
                 zeroInitial += Kt(initial(uCoeff)) * uMon * xMon # todo: check why Kt() is necessary
@@ -48,24 +97,53 @@ function initial_zero(f::MPolyRingElem{<:MPolyRingElem})
 end
 
 
-# This function simply takes a polynomial which lives in the multivariate ring, over the imprecision ring, but we know to be univariate and not involving imprecision, so we transform into a polynomial living in a univariate ring over the base field, in order to carry out root calculations.
-function root_calculation_conversion(f::AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
-    KtuX = parent(f)
-    K = base_ring(base_ring(base_ring(KtuX)))
-    activeVariableIndex = findfirst(!iszero, first(exponents(f)))
-    Kx, (x) = K[repr(gen(KtuX, activeVariableIndex))]
+@doc raw"""
+    convert_for_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
+
+Convert polynomial `h` in $K[x_i]\subseteq K{{t}}[u_1,\dots,u_n][x_1,\dots,x_n]$
+to a polynomial in $K[x_i]$.
+
+# Examples
+```jldoctest
+julia> K = algebraic_closure(QQ);
+
+julia> Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> Ktu,(u1,u2,u3) = polynomial_ring(Kt,[:u1,:u2,:u3]);
+
+julia> Ktux,(x1,x2,x3) = polynomial_ring(Ktu,[:x1,:x2,:x3]);
+
+julia> f1Tilde = t + 2*x1 + 2*x1^2;
+
+julia> h = initial_zero(f1Tilde)
+{a1: 2.00000}*x1^2 + {a1: 2.00000}*x1
+
+julia> typeof(h)
+AbstractAlgebra.Generic.MPoly{AbstractAlgebra.Generic.MPoly{OscarPuiseuxPolynomial.MPuiseuxPolyRingElem{QQBarFieldElem}}}
+
+julia> h = OscarZerodimensionalTropicalization.convert_for_puiseux_expansion(h)
+{a1: 2.00000}*x1^2 + {a1: 2.00000}*x1
+
+julia> typeof(h)
+AbstractAlgebra.Generic.Poly{QQBarFieldElem}
+
+```
+"""
+function convert_for_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
+    Ktux = parent(h)
+    K = base_ring(base_ring(base_ring(Ktux)))
+    i = findfirst(!iszero, first(exponents(h)))
+    Kx, (x) = polynomial_ring(K,symbols(Ktux)[i])
     newPoly = zero(Kx)
-    for (xExp, xCoeff) in zip(exponents(f), coefficients(f))
+    for (xExp, xCoeff) in zip(exponents(h), coefficients(h))
         for (uExp, uCoeff) in zip(exponents(xCoeff), coefficients(xCoeff))
-            if iszero(uExp)
-                newPoly += coeff(uCoeff, 0)*x^xExp[activeVariableIndex]
-            end
+            @assert iszero(uExp) "unexpected non-constant coefficient in root calculation conversion"
+            @assert length(uCoeff)==1 "unexpected non-constant coefficient in root calculation conversion"
+            newPoly += first(coefficients(uCoeff))*x^xExp[i]
         end
     end
     return newPoly
 end
-
-
 
 
 # Input:
@@ -79,21 +157,23 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem}, w::QQFieldEl
     Ktu = base_ring(Ktux)
     Kt = base_ring(Ktu)
 
+    n = ngens(Ktux)
     i = findfirst(!iszero,first(exponents(fiTilde)))
     xi = gens(Ktux)[i]
     ui = gens(Ktu)[i]
     t = first(gens(Kt))
 
-    if w >= precMax
+    if w >= precMax # maximum precision reached
         return [ui*t^w]
     end
 
-    @assert false
-
-    h = zero_initial(evaluate(f, vcat(zeros(Ktux, activeVariableIndex-1), xi*t^w, zeros(Ktux, ngens(Ktux)-activeVariableIndex))), activeVariableIndex)
-    if u_presence_checker(h) # This is the case where our input polynomial is too imprecise to compute the next coefficient of the expansion.
+    h = initial_zero(evaluate(fiTilde, vcat(zeros(Ktux, i-1), xi*t^w, zeros(Ktux, n-i))))
+    if has_non_constant_coefficients(h) # maximum possible precision reached
         return [ui*t^w]
     end
+
+    return h
+
     h = root_calculation_conversion(h)
     newRoots = Vector{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}()
     for c in roots(h)

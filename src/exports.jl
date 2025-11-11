@@ -1,3 +1,4 @@
+export has_non_constant_coefficients
 export initial_zero
 export is_newton_polygon_well_defined_with_polygon
 export puiseux_expansion

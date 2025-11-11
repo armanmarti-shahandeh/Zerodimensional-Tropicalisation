@@ -7,13 +7,24 @@ K = algebraic_closure(QQ);
 Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
 Ktu,(u1,u2,u3) = polynomial_ring(Kt,[:u1,:u2,:u3]);
 Ktux,(x1,x2,x3) = polynomial_ring(Ktu,[:x1,:x2,:x3]);
-
 f1Tilde = t + 2*x1 + 2*x1^2;
+h = initial_zero(f1Tilde)
+typeof(h)
+h = OscarZerodimensionalTropicalization.convert_for_puiseux_expansion(h)
+typeof(h)
+
+f2Tilde = (1+t+u1*t^2) + x2 + x2^2;
+initial_zero(f2Tilde)
+
 initial_zero(f1Tilde)
 
 
+K = algebraic_closure(QQ);
+Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+Ktu,(u1,u2,u3) = polynomial_ring(Kt,[:u1,:u2,:u3]);
+Ktux,(x1,x2,x3) = polynomial_ring(Ktu,[:x1,:x2,:x3]);
+f1Tilde = t + 2*x1 + 2*x1^2;
 puiseux_expansion(f1Tilde, QQ(1), QQ(3))
-f2Tilde = (t+u1*t^2) + x2 + x2^2;
 
 
 
