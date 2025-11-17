@@ -17,6 +17,7 @@ include("imports.jl")
 include("newton_polygon.jl")
 include("puiseux_expansion.jl")
 include("root_tree.jl")
+include("tropical_variety_zerodimensional_triangular.jl")
 
 include("exports.jl")
 

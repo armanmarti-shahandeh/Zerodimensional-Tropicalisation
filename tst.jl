@@ -6,6 +6,27 @@ Trop = OscarZerodimensionalTropicalization
 # set_verbosity_level(:PuiseuxExpansion, 1)
 
 
+###
+# Conversion examples
+###
+Qt,t = rational_function_field(QQ,:t);
+Qty,(y1,y2) = polynomial_ring(Qt,[:y1,:y2]);
+f1 = (y1-(1+t+t^2+t^3+t^4))*(y1-(1+t-t^2-t^3+t^4))*(y1-(1+t+t^2-t^3+t^4))*(y1-(t+t^2+t^3+t^4+t^5));
+f2 = y2 - y1;
+I = ideal([f1, f2])
+tropical_variety_zerodimensional_tadic_triangular(I, precision=7, precisionStep=1)
+
+
+Trop.prep_for_tropical_variety_zerodimensional_tadic_triangular(F)
+
+K = algebraic_closure(QQ);
+Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+Ktx,(x1,x2) = polynomial_ring(Kt,[:x1,:x2]);
+
+phi = hom(Qty, Ktx, c -> rational_function_to_puiseux_polynomial(c, Kt), gens(Ktx))
+phi(f1)
+phi(f2)
+
 
 ###
 # Example 1
@@ -16,6 +37,8 @@ Ktx,(x1,x2) = polynomial_ring(Kt,[:x1,:x2]);
 f1 = (x1-(1+t+t^2+t^3+t^4))*(x1-(1+t-t^2-t^3+t^4))*(x1-(1+t+t^2-t^3+t^4))*(x1-(t+t^2+t^3+t^4+t^5));
 f2 = x2 - x1;
 triangularSystem = [f1, f2];
+tropical_variety_zerodimensional_tadic_triangular(ideal(Ktx,triangularSystem), precision=7, precisionStep=1)
+
 Gamma = root_tree(triangularSystem, QQ(7), QQ(1))
 
 

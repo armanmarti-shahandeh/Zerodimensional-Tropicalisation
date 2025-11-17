@@ -599,7 +599,7 @@ version = "1.8.1"
 
 [[deps.Oscar]]
 deps = ["AbstractAlgebra", "AlgebraicSolving", "Compat", "Distributed", "GAP", "Hecke", "JSON", "JSON3", "LazyArtifacts", "Markdown", "Mongoc", "Nemo", "NetworkOptions", "Pkg", "Polymake", "ProgressMeter", "Random", "RandomExtensions", "Serialization", "Singular", "TOPCOM_jll", "UUIDs", "cohomCalg_jll", "f4ncgb_jll", "lib4ti2_jll"]
-git-tree-sha1 = "cbe384d4b7817e04af7d93cfb1ad30c06f819eee"
+git-tree-sha1 = "e29eb8ad08d13c7d59a5f513126979eae83f9380"
 repo-rev = "master"
 repo-url = "https://github.com/oscar-system/Oscar.jl.git"
 uuid = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
@@ -607,7 +607,7 @@ version = "1.6.0-DEV"
 
 [[deps.OscarPuiseuxPolynomial]]
 deps = ["Oscar"]
-git-tree-sha1 = "00cc62f7494439cca94aa27e588cb4c347ace8fd"
+git-tree-sha1 = "c6cb3864ce93efbf2347999e2c636df99be4db93"
 repo-rev = "main"
 repo-url = "https://github.com/ollieclarke8787/OscarPuiseuxPolynomials"
 uuid = "7e8d91a7-ef99-4171-8ecc-0b23a9b9da6d"

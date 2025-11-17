@@ -21,24 +21,44 @@ function is_lower_triangular(F::Vector{<:MPolyRingElem})
     return true
 end
 
-function clear_denominators_and_convert_from_rational_functions_to_puiseux_series(F::Vector; precision::Int=32)
-    F = [ f*lcm(denominator.(coefficients(f))) for f in F ] # clear denominators
-    Ktx = parent(first(F))     # polynomial ring over a rational function field
-    Kt = coefficient_ring(Ktx) # rational function field
-    K = base_ring(Kt)          # coefficient field of rational functions
-    KK = algebraic_closure(K)
-    KKt,t = puiseux_series_field(KK,precision,:t)
-    KKtx,x = polynomial_ring(KKt,symbols(Ktx))
-    return hom(Ktx,KKtx,c->(map_coefficients(KK, numerator(c))(t)),x).(F)
+function create_m_puiseux_polynomial_ring(Kt::Generic.RationalFunctionField)
+    K = base_ring(Kt)
+    tString = string(gen(Kt))
+    L = algebraic_closure(K)
+    Lt, _ = puiseux_polynomial_ring(L, [tString])
+    return Lt
 end
 
-function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal, ::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
-    # convert to Puiseux series
-    triangularSet = clear_denominators_and_convert_from_rational_functions_to_puiseux_series(gens(I),precision=precision)
-
-    if get_assertion_level(:ZerodimensionalTropicalization) > 0
-        @req is_lower_triangular(triangularSet) "The input polynomials must be lower triangular."
+function rational_function_to_puiseux_polynomial(c::Generic.RationalFunctionFieldElem, Lt::MPuiseuxPolyRing)
+    @req isone(denominator(c)) "denominator of rational function must be 1"
+    c = numerator(c)
+    t = first(gens(Lt))
+    d = zero(Lt)
+    for (i, ci) in enumerate(coefficients(c))
+        d += t^i * Lt(ci)
     end
+    return d
+end
+
+function prep_for_tropical_variety_zerodimensional_tadic_triangular(F::Vector{<:MPolyRingElem})
+    F = [ f*lcm(denominator.(coefficients(f))) for f in F ]
+
+    Ktx = parent(F[1])
+    Kt = base_ring(Ktx)
+    Lt = create_m_puiseux_polynomial_ring(Kt)
+    Ltx, x = polynomial_ring(Lt, symbols(Ktx))
+
+    phi = hom(Ktx, Ltx, c-> rational_function_to_puiseux_polynomial(c, Lt), x)
+    return phi.(F)
+end
+
+function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}; precision::Int=32, precisionStep::Int=4)
+
+    # check that generators are triangular set
+    triangularSet = gens(I)
+    @req is_lower_triangular(triangularSet) "Generators of input ideal must be lower triangular."
+
+    triangularSet = prep_for_tropical_variety_zerodimensional_tadic_triangular(triangularSet)
 
     # initialize book-keeping data
     Gamma = root_tree(triangularSet, QQ(precision), QQ(precisionStep))
@@ -52,13 +72,13 @@ function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal, ::Trop
     # Main loop
     ###
     while true
-        leaf = pick_ungrown_leaf(Gamma) # pick a working leaf and abort loop if none exist
+        leaf = pick_ungrown_leaf(Gamma) 
         if leaf<0
             break
         end
-        extendSuccessful = grow!(Gamma,leaf) # try extending the leaf
+        extendSuccessful = grow!(Gamma,leaf) 
         if !extendSuccessful
-            reinforce!(Gamma,leaf) # try reinforcing the leaf
+            reinforce!(Gamma,leaf)
         end
         if get_verbosity_level(:ZerodimensionalTropicalization) > 0
             println("Updated root tree:")
