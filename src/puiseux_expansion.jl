@@ -182,7 +182,7 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
         g = evaluate(fiTilde, vcat(zeros(Ktux, i-1), xi+Ktux(c)*t^w, zeros(Ktux, ngens(Ktux)-i)))
         canComputeNextTerm, sigma = is_newton_polygon_well_defined_with_polygon(g)
         if !canComputeNextTerm
-            if !(ui*t^w in newRoots)
+            if !(ui*t^w in newRoots) # TODO: check whether this is correct or whether we want to return [ui*t^w]
                 push!(newRoots, ui*t^w)
             end
             continue
