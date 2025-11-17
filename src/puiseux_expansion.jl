@@ -6,7 +6,7 @@
 
 
 @doc raw"""
-    has_non_constant_coefficients(fTilde::MPolyRingElem{<:MPolyRingElem})
+    has_non_constant_coefficients(fTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}})
 
 Given a polynomial `fTilde` in $K[u_1,...,u_n][x_1,...,x_n]$, return `true` if
 `fTilde` has coefficients in $K[u_1,...,u_n]\setminus K$.  Return `false` if all
@@ -34,7 +34,7 @@ true
 
 ```
 """
-function has_non_constant_coefficients(fTilde::MPolyRingElem{<:MPolyRingElem})
+function has_non_constant_coefficients(fTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}})
     for xCoeff in coefficients(fTilde)
         if any(!iszero, exponents(xCoeff))
             return true
@@ -46,10 +46,10 @@ end
 
 
 @doc raw"""
-    initial_zero(fTilde::MPolyRingElem{<:MPolyRingElem})
+    initial_zero(fTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}})
 
 Given a polynomial `fTilde` in $K[u_1,...,u_n][x_1,...,x_n]$, return the initial
-of `fTilde` with respect to weight vector `0`.
+of `fTilde` with respect to weight vector $(0,...,0)$.
 
 # Examples
 ```jldoctest
@@ -73,7 +73,7 @@ julia> initial_zero(f2Tilde)
 
 ```
 """
-function initial_zero(fTilde::MPolyRingElem{<:MPolyRingElem})
+function initial_zero(fTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}})
     # iterate over all x-coefficients (polynomials in u),
     # iterate over all u-coefficients (puiseux polynomials),
     # and record all valuations found. find the minimal one
@@ -98,7 +98,7 @@ end
 
 
 @doc raw"""
-    convert_for_roots_in_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
+    convert_for_roots_in_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}})
 
 Convert polynomial `h` in $K[x_i]\subseteq K{{t}}[u_1,\dots,u_n][x_1,\dots,x_n]$
 to a polynomial in $K[x_i]$.
@@ -129,7 +129,7 @@ AbstractAlgebra.Generic.Poly{QQBarFieldElem}
 
 ```
 """
-function convert_for_roots_in_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
+function convert_for_roots_in_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}})
     Ktux = parent(h)
     K = base_ring(base_ring(base_ring(Ktux)))
     i = findfirst(!iszero, first(exponents(h)))
@@ -147,7 +147,7 @@ end
 
 
 
-function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem}, w::QQFieldElem, precMax::QQFieldElem)
+function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}}, w::QQFieldElem, precMax::QQFieldElem)
     @req length(fiTilde)>1 "polynomial must not be monomial"
     
     Ktux = parent(fiTilde)

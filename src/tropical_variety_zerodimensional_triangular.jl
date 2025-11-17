@@ -1,7 +1,10 @@
-function tropical_variety_zerodimensional_tadic(I::MPolyIdeal, nu::TropicalSemiringMap; precision::Int=32)
+function tropical_variety_zerodimensional_tadic(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32)
+    @req coefficient_ring(I) == domain(nu) "coefficient ring of input ideal must match tropical semiring map domain"
+    @req domain(nu)(uniformizer(nu)) == gen(domain(nu)) "tropical semiring map must encode t-adic valuation"
+
     Sigma = Vector{QQFieldElem}[]
     for F in triangular_decomposition(I; algorithm=:lazard_factorized, ord=gens(base_ring(I)))
-        Sigma = vcat(Sigma, tropical_variety_zerodimensional_tadic_triangular(F, nu; precision=precision))
+        Sigma = vcat(Sigma, tropical_points_tadic_triangular(F, nu; precision=precision))
     end
     Sigma = unique(sort(Sigma))
     TropI = tropical_variety(polyhedral_complex(incidence_matrix([[i] for i in 1:length(Sigma)]),Sigma),
