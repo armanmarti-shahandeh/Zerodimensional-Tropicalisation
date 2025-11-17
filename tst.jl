@@ -7,14 +7,36 @@ Trop = OscarZerodimensionalTropicalization
 
 
 ###
-# Conversion examples
+# Examples
 ###
-Qt,t = rational_function_field(QQ,:t);
-Qty,(y1,y2) = polynomial_ring(Qt,[:y1,:y2]);
-f1 = (y1-(1+t+t^2+t^3+t^4))*(y1-(1+t-t^2-t^3+t^4))*(y1-(1+t+t^2-t^3+t^4))*(y1-(t+t^2+t^3+t^4+t^5));
-f2 = y2 - y1;
-I = ideal([f1, f2])
+K,t = rational_function_field(QQ,:t);
+K,t = rational_function_field(GF(3),:t);
+Kx,(x1,x2) = polynomial_ring(K,[:x1,:x2]);
+I = ideal([zero(Kx)]) # checking pathological cases
+I = ideal([Kx(t)])
 tropical_variety_zerodimensional_tadic_triangular(I, precision=7, precisionStep=1)
+
+
+Ky,(x1,x2) = polynomial_ring(K,[:x1,:x2]);
+f1 = (x1+(1+2*t+t^2))*(x1+(1+2*t+t^3))
+f2 = x2 - (x1+1+2*t)
+I = ideal([f1,f2]) # checking that branching works
+tropical_variety_zerodimensional_tadic_triangular(I, precision=7, precisionStep=1)
+
+
+Ky,(x1,x2) = polynomial_ring(K,[:x1,:x2]);
+f1 = (x1+(1+2*t+t^2))*(x1+(1+2*t+t^2))
+f2 = x2 - (x1+1+2*t)
+I = ideal([f1,f2]) # checking that multiplicity works
+tropical_variety_zerodimensional_tadic_triangular(I, precision=7, precisionStep=1)
+
+Ky,(x1,x2) = polynomial_ring(K,[:x1,:x2]);
+f1 = (x1+t^3)*(x1+1+t^4)
+f2 = x2 - x1
+I = ideal([f1,f2])
+tropical_variety_zerodimensional_tadic_triangular(I, precision=7, precisionStep=1)
+
+
 
 
 Trop.prep_for_tropical_variety_zerodimensional_tadic_triangular(F)

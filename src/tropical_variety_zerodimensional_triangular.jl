@@ -13,8 +13,12 @@ end
 # i.e., F[1] is a polynomial in x1, F[2] is a polynomial in x1 and x2, etc.
 function is_lower_triangular(F::Vector{<:MPolyRingElem})
     for (i,f) in enumerate(F)
-        # sum all exponent vectors and check that entries after i are zero
-        if any(!iszero,sum(exponents(f))[i+1:end])
+        # sum all exponent vectors and check that entry i exists and entries after i are zero
+        Alpha = sum(exponents(f), init=zeros(ZZRingElem, ngens(parent(f))))
+        if Alpha[i] == 0
+            return false
+        end
+        if any(!iszero,Alpha[i+1:end])
             return false
         end
     end
