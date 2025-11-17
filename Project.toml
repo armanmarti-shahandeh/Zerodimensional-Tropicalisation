@@ -1,0 +1,12 @@
+name = "OscarZerodimensionalTropicalization"
+uuid = "c58179d2-d855-41c8-9bce-46e31ae31132"
+version = "0.1.0"
+authors = ["Yue Ren <yue.ren.kl@gmail.com>"]
+
+[deps]
+Oscar = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
+OscarPuiseuxPolynomial = "7e8d91a7-ef99-4171-8ecc-0b23a9b9da6d"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+
+[compat]
+Oscar = "1.6.0"

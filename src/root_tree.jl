@@ -1,4 +1,5 @@
-###
+################################################################################
+#
 # RootTree
 # ========
 # RootTree is an internal struct for tropicalizing zerodimensional triangular systems.  It consists of
@@ -27,7 +28,7 @@
 #  - roots + precs: [TODO: fill details here]
 # Note: k=1 means we have increased precision for roots[i_1] and updated roots[i_2],...,roots[i_l] accordingly
 #  k>1 means we have updated roots[i_k],...,roots[i_l] using existing roots[i_1], ..., roots[i_{k-1}]
-###
+################################################################################
 mutable struct RootTree
     system::Vector{<:MPolyRingElem}
     tree::Graph{Directed}
@@ -36,8 +37,8 @@ mutable struct RootTree
     precMax::QQFieldElem
     precStep::QQFieldElem
 
-    # setting default values for each field
-    function RootTree(system::Vector{<:MPolyRingElem}=MPolyRingElem[],
+    # setting default values for some fields
+    function RootTree(system::Vector{<:MPolyRingElem},
                       tree::Graph{Directed}=Graph{Directed}(0),
                       roots::Vector{<:MPolyRingElem}=MPolyRingElem[],
                       precs::Vector{QQFieldElem}=QQFieldElem[0],
@@ -51,7 +52,6 @@ end
 ###
 # Accessors
 ###
-import Oscar.roots
 system(Gamma::RootTree) = Gamma.system
 tree(Gamma::RootTree) = Gamma.tree
 roots(Gamma::RootTree) = Gamma.roots
@@ -67,36 +67,32 @@ precStep(Gamma::RootTree) = Gamma.precStep
 ###
 # Combinatorial properties
 ###
-import Oscar.n_vertices
-import Oscar.nv
-import Oscar.n_edges
-import Oscar.ne
-import Oscar.edges
-import Oscar.degree
-import Oscar.shortest_path_dijkstra
 n_vertices(Gamma::RootTree) = n_vertices(tree(Gamma))
-nv(Gamma::RootTree) = nv(tree(Gamma))
 n_edges(Gamma::RootTree) = n_edges(tree(Gamma))
-ne(Gamma::RootTree) = ne(tree(Gamma))
 edges(Gamma::RootTree) = edges(tree(Gamma))
 degree(Gamma::RootTree, vertex::Int) = degree(tree(Gamma), vertex)
 shortest_path_dijkstra(Gamma::RootTree, src::Int, dst::Int) = shortest_path_dijkstra(tree(Gamma), src, dst)
 
-import Oscar.depth
 function depth(Gamma::RootTree, vertex::Int)
     return length(shortest_path_dijkstra(Gamma, 1, vertex))
 end
 
-function leaves(Gamma::RootTree)
+function is_leaf(Gamma::RootTree, vertex::Int)
     # degree of directed graphs in Oscar only counts outgoing edges
     # see https://github.com/oscar-system/Oscar.jl/issues/4440
-    return [vertex for vertex in 1:n_vertices(Gamma) if degree(Gamma, vertex)==0]
+    return iszero(degree(Gamma,vertex))
+end 
+
+function leaves(Gamma::RootTree)
+    return [vertex for vertex in 1:n_vertices(Gamma) if is_leaf(Gamma, vertex)]
 end
 
-# Input:
-# - Gamma, a RootTree
-# - vertex, a vertex of Gamma
-# Return: all vertices of Gamma below vertex
+
+@doc raw"""
+    descendants(Gamma::RootTree, vertex::Int)
+
+Return all vertices of `Gamma` below `vertex`.
+"""
 function descendants(Gamma::RootTree, vertex::Int)
     # Create dictionary of children
     children = Dict{Int, Vector{Int}}()
@@ -116,11 +112,12 @@ function descendants(Gamma::RootTree, vertex::Int)
     return verticesBelow
 end
 
-# Input:
-#   - Gamma, a RootTree
-#   - vertex, a vertex of Gamma, not necessarily a leaf
-# Return:
-#   - all vertices on the branch of Gamma ending at vertex
+
+@doc raw"""
+    branch(Gamma::RootTree, vertex::Int)
+
+Return all vertices on branch of `Gamma` ending at `vertex`.
+"""
 function branch(Gamma::RootTree, vertex::Int)
     return shortest_path_dijkstra(Gamma, 1, vertex)
 end
@@ -130,24 +127,30 @@ end
 # Algebraic properties
 ###
 
-# Input: RootTree
-# Return: the variables representing uncertainty
+@doc raw"""
+    uncertainty_variables(Gamma::RootTree)
+
+Return all uncertainty variables of `Gamma`.
+"""
 function uncertainty_variables(Gamma::RootTree)
     return gens(base_ring(parent(first(system(Gamma)))))
 end
 
-# Input:
-# - Gamma, a RootTree
-# - i, a variable index
-# Return: the variable representing uncertainty in the i-th variable
+@doc raw"""
+    uncertainty_variable(Gamma::RootTree, i::Int)
+
+Return the `i`-th uncertainty variable of `Gamma`.
+"""
 function uncertainty_variable(Gamma::RootTree, i::Int)
     return gen(base_ring(parent(first(system(Gamma)))),i)
 end
 
-# Input:
-# - Gamma, a RootTree
-# - i, a variable index
-# Return: the i-th polynomial in system(Gamma)
+@doc raw"""
+    system_polynomial(Gamma::RootTree, i::Int)
+
+Return the `i`-th polynomial in the triangular system of `Gamma`, i.e., the
+polynomial containing the first `i` variables.
+"""
 function system_polynomial(Gamma::RootTree, i::Int)
     return system(Gamma)[i]
 end
@@ -222,8 +225,6 @@ end
 ###
 # Mutators
 ###
-import Oscar.rem_vertex!
-import Oscar.rem_vertices!
 function rem_vertex!(Gamma::RootTree, vertex::Int)
     # for the sake of consistency with rem_vertex!(::Graph)
     # return Boolean indicating whether vertex was removed
@@ -246,7 +247,12 @@ function rem_vertices!(Gamma::RootTree, vertices::Vector{Int})
 end
 
 
-# A simple tool for updating precision: if called on the initial root, it will up the precision by the precision step, if called on any subsequent root, it will update the precision to match that of the initial root.
+@doc raw"""
+    increase_precision!(Gamma::RootTree, vertex::Int)
+
+Increase the precision of the root at `vertex` in `Gamma` by `precStep(Gamma)`
+if it is at depth 2.  Otherwise set it to the precision of its parent.
+"""
 function increase_precision!(Gamma::RootTree, vertex::Int)
     if depth(Gamma, vertex) == 2
         Gamma.precs[vertex] += precStep(Gamma)
@@ -286,25 +292,45 @@ end
 # Constructors
 ###
 
-# trivial constructor
-function root_tree()
-    return RootTree()
-end
+@doc raw"""
+    root_tree(triangularSystem::Vector{<:MPolyRingElem}, precMax::QQFieldElem=QQ(0), precStep::QQFieldElem=QQ(1))
 
-# Input:
-# - triangularSystem, a zerodimensional triangular set over a Puiseux series field
-# - maxPrecision, a maximum precision as a safeguard for infinite loops
-# Output:
-# - the initial RootTree for triangularSystem, consisting only of a single root vertex, no edges, and no actual roots
-function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}},precMax::QQFieldElem=QQ(0),precStep::QQFieldElem=QQ(1))
-    @req is_zerodimensional_triangular_set(triangularSystem) "Input must be a zerodimensional triangular set."
+Initialize and return a root tree to tropicalize `triangularSystem`.  `precMax` is the maximum relative precision to be used, `precStep` is the step size for increasing precision.
+
+# Examples
+```jldoctest
+julia> K = algebraic_closure(QQ);
+
+julia> Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> nu = tropical_semiring_map(Kt,t);
+
+julia> R,(x1,x2) = Kt[:x1,:x2];
+
+julia> F = [t+x1+x1^2, x1+x2+x2^2];
+
+julia> root_tree(F, nu)
+root tree of the triangular system
+ {a1: 1.00000}*x1^2 + {a1: 1.00000}*x1 + t
+ {a1: 1.00000}*x1 + {a1: 1.00000}*x2^2 + {a1: 1.00000}*x2
+with edges Edge[]
+with precisions and roots
+ 1: (0) 0
+
+```
+"""
+function root_tree(triangularSystem::Vector{<:MPolyRingElem}, precMax::QQFieldElem=QQ(0), precStep::QQFieldElem=QQ(1))
+    @req is_zerodimensional_triangular_set(triangularSystem) "polynomials must be a zerodimensional triangular set."
+    @req precMax >= QQ(0) "maximum precision must be non-negative."
+    @req precStep > QQ(0) "precision step must be positive."
 
     # Add uncertainty variables to the ambient ring of triangularSystem
     Kx = parent(first(triangularSystem))
+    n = ngens(Kx)
     K = base_ring(Kx)
-    Ku, _ = polynomial_ring(K, ["u$i" for i in 1:ngens(Kx)])
+    Ku, _ = polynomial_ring(K, :u=>1:n)
     Kux, _ = polynomial_ring(Ku, symbols(Kx))
-    phi = hom(Kx,Kux,c->Ku(c),gens(Kux))
+    phi = hom(Kx, Kux, c->Ku(c), gens(Kux))
     system = phi.(triangularSystem)
 
     # Initialize the rest
@@ -316,20 +342,40 @@ function root_tree(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:Ab
 end
 
 # tests whether input is a zero-dimensional triangular set
-# TODO: make the test more sensible
-function is_zerodimensional_triangular_set(triangularSystem::Vector{<:AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}})
-    return length(triangularSystem) == ngens(parent(first(triangularSystem)))
+function is_zerodimensional_triangular_set(triangularSystem::Vector{<:MPolyRingElem})
+    R = parent(first(triangularSystem))
+    n = ngens(R)
+
+    # check that triangularSystem is of correct length
+    if n != length(triangularSystem)
+        return false
+    end
+
+    # check that i-th entry contains variable i
+    # and does not contain variables i+1 to n
+    for (i,fi) in enumerate(triangularSystem)
+        alpha = sum(exponents(fi))
+        if iszero(alpha[i]) || any(!iszero, alpha[i+1:n])
+            return false
+        end
+    end
+
+    return true
 end
 
-# Input:
-# - sigma, an extended Newton polyhedron of a univariate polynomial
-# - u, an uncertainty variable to be used for the approximate roots
-# Output:
-# - the (expected) RootTree for sigma, depth one with one vertex for each root valuation of fTilde
-function elementary_root_tree(sigma::Polyhedron, u::MPolyRingElem)
-    # compute a list of negated slopes of sigma
-    # - v[2]<0 filters out the two non-lower slopes
-    # - v[1]/v[2] is the negated slope as v is an outer normal vector
+
+@doc raw"""
+    bud(sigma::Polyhedron, u::MPolyRingElem)
+
+Return a `RootTree` representing the new leaves arising from the
+well-defined extended Newton polyhedron `sigma`.  Each new leaf is assigned
+the uncertainty variable `u` multiplied by `t` to the power of the
+negated slope of a lower facet of `sigma`.
+"""
+function bud(sigma::Polyhedron, u::MPolyRingElem)
+    # compute a list of negated slopes of sigma from the outer normal vectors `v`
+    # - v[2]<0 means a non-vertical facet
+    # - v[1]/v[2] is the negated slope
     negatedSlopes = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 ]
 
     # construct the RootTree
@@ -338,7 +384,7 @@ function elementary_root_tree(sigma::Polyhedron, u::MPolyRingElem)
     Ku = parent(u)
     roots = zeros(Ku,1)
     precs = QQFieldElem[0]
-    t = gen(base_ring(Ku))
+    t = first(gens(base_ring(Ku)))
     for lambda in negatedSlopes
         # For each lower slope lambda add
         #  - u*t^lambda to roots,
@@ -360,7 +406,6 @@ end
 # TODO: this should probably be display, but I don't know how to overload it.  The following did not work:
 # import Base.display
 # function display(io::IO, Gamma::RootTree)
-import Base.show
 function Base.show(io::IO, Gamma::RootTree)
     if iszero(n_vertices(tree(Gamma)))
         println(io, "empty root tree")
@@ -381,7 +426,6 @@ end
 ###
 # Visualization
 ###
-import Oscar.visualize
 function visualize(Gamma::RootTree)
     visualize(tree(Gamma))
 end
@@ -391,10 +435,12 @@ end
 # Growing RootTree
 ###
 
-# Input:
-#   - Gamma, a RootTree
-# Return:
-#   - a leaf of the tree at a depth less than maxDepth if it exists, -1 otherwise
+@doc raw"""
+    pick_ungrown_leaf(Gamma::RootTree; strategy::Symbol=:depth_first)
+
+Return a leaf of `Gamma` that can be grown.  Possible strategies are
+`depth_first`, `width_first`, and `random`.
+"""
 function pick_ungrown_leaf(Gamma::RootTree; strategy::Symbol=:depth_first)
     GammaLeaves = leaves(Gamma)
     depths = length.(shortest_path_dijkstra.(Ref(Gamma), 1, GammaLeaves)) .-1
@@ -409,24 +455,61 @@ function pick_ungrown_leaf(Gamma::RootTree; strategy::Symbol=:depth_first)
     if strategy == :width_first
         return first(ungrownLeaves)
     end
+    if strategy == :random
+        return rand(ungrownLeaves)
+    end
     error("Unknown picking strategy: $strategy")
 end
 
 
-# Input:
-#   - Gamma, a RootTree
-#   - leaf, a leaf of Gamma
-# Return: a boolean that records whether Gamma has changed
-function extend!(Gamma::RootTree, leaf::Int)
+@doc raw"""
+    grow!(Gamma::RootTree, leaf::Int)
+
+If the Newton polygon of `extension_polynomial(Gamma,leaf)` is well-defined,
+grow `Gamma` at `leaf` and return `true`.  Otherwise return `false`.
+
+# Examples
+```jldoctest
+julia> K = algebraic_closure(QQ);
+Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> Kt,(t,) = puiseux_polynomial_ring(K,["t"]);
+
+julia> Ktx,(x1,x2) = polynomial_ring(Kt,[:x1,:x2]);
+
+julia> f1 = t - x1 + x1^2;
+
+julia> f2 = x2 - x1;
+
+julia> triangularSystem = [f1, f2];
+
+julia> Gamma = root_tree(triangularSystem, QQ(7), QQ(3))
+root tree of the triangular system
+ x1^2 + {a1: -1.00000}*x1 + t
+ {a1: -1.00000}*x1 + x2
+with edges Edge[]
+with precisions and roots
+ 1: (7) 0
+
+
+julia> OscarZerodimensionalTropicalization.grow!(Gamma,1)
+true
+
+```
+"""
+function grow!(Gamma::RootTree, leaf::Int)
+    # check that leaf is indeed a leaf of Gamma
+    @req iszero(degree(Gamma,leaf)) "trying to grow a non-leaf vertex"
+
     # Construct the working polynomial fTilde = f_i(~z_1,...,~z_{i-1},x_i)
     fTilde = extension_polynomial(Gamma,leaf)
 
     # check whether the extended newton polyhedron is well defined
     # if yes, use it to extend Gamma at leaf
-    canExtend, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(fTilde)
+    canExtend, sigma = is_newton_polygon_well_defined_with_polygon(fTilde)
     if canExtend
         ui = uncertainty_variable(Gamma,depth(Gamma,leaf))
-        graft!(Gamma, leaf, elementary_root_tree(sigma,ui))
+        graft!(Gamma, leaf, bud(sigma,ui))
     end
     return canExtend
 end
@@ -436,7 +519,7 @@ end
 #   - vertex, a vertex in Gamma
 #   - newInstances, a vector of length i, containing the i new root instances that split at "vertex"
 # Return: a new RootTree GammaNew, which is the sub-tree of Gamma with dummy root representing the parent of "vertex", such that the structure of the tree rooted at "vertex" has been entirely duplicated, consisting of i new copies
-function replicated_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:MPolyRingElem})
+function clone_subtree(Gamma::RootTree, vertex::Int, newInstances::Vector{<:MPolyRingElem})
     # Necessary variables for initialising the new RootTree
     newSystem = MPolyRingElem[]
     newTree = Graph{Directed}(1)
@@ -471,50 +554,53 @@ end
 # Note that, separate to this function, we need to manually update the increased precision of the root, through increase_precision!
 function improve_root!(Gamma::RootTree, vertex::Int)
     rootToImprove = root(Gamma, vertex)
-    Ku = parent(rootToImprove)
-    certainApproximation = certain_approximation(Gamma, vertex)
-    tailValuation = uncertain_valuation(Gamma, vertex)
     rootBranch = branch(Gamma, vertex)
-    prepPoly = reinforcement_polynomial(Gamma, vertex) # This is the polynomial whose root we are actually improving, and reinforcement_polynomial substitutes all previous roots in the triangular set, as well any current calculation we have done at rootToImprove itself
-    precStop = depth(Gamma, vertex)==2 ? prec(Gamma, vertex) : precMax(Gamma) # This if-else statement addresses the fact that if we are computing the first root in the branch, we have no constraints on our computation, and we must specify the exact precision to compute up to; if we are at any deeper point of the rootBranch, we compute the root until we no longer can (encountered uncertainty)
 
-    if get_verbosity_level(:ZerodimensionalTropicalizationImproveRoot) > 0
-        println("improve_root! called with:")
-        println("Gamma ", Gamma)
-        println("vertex ", vertex)
-        println("data:")
-        println("rootToImprove ", rootToImprove)
-        println("certainApproximation ", certainApproximation)
-        println("precStop ", precStop)
-        println("prepPoly ",prepPoly)
-        println("tailValuation ", tailValuation)
-    end
-    improvedRoots = local_field_expansion(prepPoly, tailValuation, precStop) # This carries out the calculation of our further computed roots, and this will replace what was previously in our "uncertainty tail"
+    Ku = parent(rootToImprove)
+    certainApproximation = certain_approximation(Gamma, vertex) # known terms of the root
+    tailValuation = uncertain_valuation(Gamma, vertex)          # valuation from which unkown terms starts
+    prepPoly = reinforcement_polynomial(Gamma, vertex)          # polynomial for the unkown terms
+    precStop = depth(Gamma, vertex)==2 ? prec(Gamma, vertex) : precMax(Gamma) # Use `prec(Gamma, vertex)` for z1, use `precMax(Gamma)` for all other zi.
 
-    Gamma.roots[vertex] = certainApproximation + Ku(improvedRoots[1]) # We can simply swap the new approximated tail in for the original vertex position
-    if length(improvedRoots)>1 # This is the case where we have more instances of the same root, so we need to duplicate the entire sub-tree below this point, using replicate_subtree
+    improvedRoots = puiseux_expansion(prepPoly, tailValuation, precStop) # compute unkown terms
+
+    Gamma.roots[vertex] = certainApproximation + Ku(improvedRoots[1]) # use existing vertex to store first solution in the original vertex
+    if length(improvedRoots)>1                                        # create new branches to store additional solutions
         newInstances = [certainApproximation + Ku(improvedRoot) for improvedRoot in improvedRoots[2:end]]
-        graft!(Gamma, rootBranch[end-1], replicated_subtree(Gamma, vertex, newInstances))
+        graft!(Gamma, rootBranch[end-1], clone_subtree(Gamma, vertex, newInstances))
     end
     return true
 end
 
 
-# Input:
-#   - Gamma, a RootTree
-#   - leaf, a leaf of Gamma
-# Return: a boolean that records whether Gamma changed (always true)
+@doc raw"""
+    reinforce!(Gamma::RootTree, leaf::Int)
+
+Suppose `leaf` is the end of a branch $(i_1,...,i_k)$ with roots
+$(z_1,...,z_k)$, and precision $(p_1,...,p_k)$ meaning $p_1$ is the precision
+used in the computation of $z_1$, and $p_j$ for $j>1$ is the precision of $z_1$
+used in the computation of $z_j$.
+
+The function reinforces the branch of `Gamma` ending at `leaf` by either
+(a) if $p_k<p_1$, find the first $j$ with $p_j<p_1$ and improve $p_j$ and $z_j$
+(b) if $p_k=p_1$, increase $p_1$ and improve $p_1$ and $z_1$
+
+!!! note
+    This function may need to be called multiple times until `leaf` has the
+    necessary precision.  The reason for this cautious stepwise approach is
+    because roots may split wildly during the reinforcement.
+"""
 function reinforce!(Gamma::RootTree, leaf::Int)
-    GammaBranch = branch(Gamma,leaf) # Construct the branch ending in leaf
-    popfirst!(GammaBranch) # remove the dummy vertex
+    GammaBranch = branch(Gamma,leaf) 
+    popfirst!(GammaBranch) 
     precBase = prec(Gamma,GammaBranch[1])
-    if precBase==prec(Gamma,leaf)  # If the precision at the base of the branch has been propagated all the way down to the leaf, we need to further compute the base root
+    if precBase==prec(Gamma,leaf)  
         vertexToReinforce = GammaBranch[1]
-    else # Otherwise, we need to find the first root in the branch not to have fully used the computation at the base of the root
-        i = findfirst(vertex->prec(Gamma,vertex)!=precBase, GammaBranch)
+    else 
+        i = findfirst(vertex->prec(Gamma,vertex)<precBase, GammaBranch)
         vertexToReinforce = GammaBranch[i]
     end
-    increase_precision!(Gamma, vertexToReinforce) #This simply updates the precision stored, and then improve_root! below actually carries out the computation to implement this new precision
+    increase_precision!(Gamma, vertexToReinforce) 
     improve_root!(Gamma, vertexToReinforce)
     return true
 end
@@ -524,8 +610,12 @@ end
 # Converting RootTree to tropical points
 ###
 
-# Input: A fully grown RootTree
-# Return: the points in the tropicalizations
+@doc raw"""
+    tropical_points(Gamma::RootTree)
+
+Return the tropical points represented by the leaves of `Gamma`.  Will return
+partial solutions if `Gamma` is not fully grown.
+"""
 function tropical_points(Gamma::RootTree)
     GammaLeaves = leaves(Gamma)
     GammaTrop = Vector{QQFieldElem}[]
