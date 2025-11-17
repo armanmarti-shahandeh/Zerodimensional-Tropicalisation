@@ -56,25 +56,23 @@ function prep_for_tropical_variety_zerodimensional_tadic_triangular(F::Vector{<:
     return phi.(F)
 end
 
-function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}; precision::Int=32, precisionStep::Int=4)
+function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
+    @req coefficient_ring(I) == domain(nu) "coefficient ring of input ideal must match tropical semiring map domain"
+    @req domain(nu)(uniformizer(nu)) == gen(domain(nu)) "tropical semiring map must encode t-adic valuation"
 
-    # check that generators are triangular set
+    # check that generators are triangular set and prep for root tree
     triangularSet = gens(I)
     @req is_lower_triangular(triangularSet) "Generators of input ideal must be lower triangular."
-
     triangularSet = prep_for_tropical_variety_zerodimensional_tadic_triangular(triangularSet)
 
-    # initialize book-keeping data
+    # initialize root tree
     Gamma = root_tree(triangularSet, QQ(precision), QQ(precisionStep))
-
     if get_verbosity_level(:ZerodimensionalTropicalization) > 0
         println("Starting root tree:")
         println(Gamma)
     end
 
-    ###
-    # Main loop
-    ###
+    # grow root tree
     while true
         leaf = pick_ungrown_leaf(Gamma) 
         if leaf<0
@@ -89,5 +87,11 @@ function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal{<:Gener
             println(Gamma)
         end
     end
-    return tropical_points(Gamma)
+
+    # extract and return tropical points
+    TropI = tropical_points(Gamma)
+    if convention(nu) == max
+        TropI = -TropI
+    end
+    return TropI
 end
