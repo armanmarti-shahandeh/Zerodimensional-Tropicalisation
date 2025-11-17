@@ -173,25 +173,21 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
 
     newRoots = elem_type(Ktu)[]
     for c in roots(h)
-        if iszero(c)   
+        if iszero(c)
+            # skip zero roots, they lead to roots of valuation > w
             continue
         end
-        if get_verbosity_level(:PuiseuxExpansion) > 0
-            println("Found root c=", c, " at exponent w=", w)
-        end
+        @vprintln :PuiseuxExpansion "Found root c=$(c) at exponent w=$(w)"
+
         g = evaluate(fiTilde, vcat(zeros(Ktux, i-1), xi+Ktux(c)*t^w, zeros(Ktux, ngens(Ktux)-i)))
-        canComputeNextValuation, sigma = is_newton_polygon_well_defined_with_polygon(g)
-        if !canComputeNextValuation  # This is the case where we have u_i's present in our Newton polygon vertices, so we cannot compute the valuation of the next term of our root
+        canComputeNextTerm, sigma = is_newton_polygon_well_defined_with_polygon(g)
+        if !canComputeNextTerm
             if !(ui*t^w in newRoots)
                 push!(newRoots, ui*t^w)
             end
             continue
         end
         nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
-        # if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
-        #     push!(newRoots, Su(c*t^w))
-        #     continue
-        # end
         for nextExponent in nextExponents
             for tailTerm in puiseux_expansion(g,nextExponent,precMax)
                 push!(newRoots, Kt(c)*t^w + tailTerm)

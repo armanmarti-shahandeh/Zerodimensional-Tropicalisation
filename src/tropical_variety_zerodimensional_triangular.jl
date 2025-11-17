@@ -16,7 +16,7 @@ end
 # i.e., F[1] is a polynomial in x1, F[2] is a polynomial in x1 and x2, etc.
 function is_lower_triangular(F::Vector{<:MPolyRingElem})
     for (i,f) in enumerate(F)
-        # sum all exponent vectors and check that entry i exists and entries after i are zero
+        # sum all exponent vectors. check that entry i is non-zero and entries after i are zero
         Alpha = sum(exponents(f), init=zeros(ZZRingElem, ngens(parent(f))))
         if Alpha[i] == 0
             return false
@@ -48,21 +48,18 @@ function rational_function_to_puiseux_polynomial(c::Generic.RationalFunctionFiel
 end
 
 function prep_for_tropical_variety_zerodimensional_tadic_triangular(F::Vector{<:MPolyRingElem})
-    F = [ f*lcm(denominator.(coefficients(f))) for f in F ]
+    F = [ f*lcm(denominator.(coefficients(f))) for f in F ] # clear denominators
 
     Ktx = parent(F[1])
     Kt = base_ring(Ktx)
     Lt = create_m_puiseux_polynomial_ring(Kt)
     Ltx, x = polynomial_ring(Lt, symbols(Ktx))
 
-    phi = hom(Ktx, Ltx, c-> rational_function_to_puiseux_polynomial(c, Lt), x)
-    return phi.(F)
+    homPrep = hom(Ktx, Ltx, c->rational_function_to_puiseux_polynomial(c, Lt), x)
+    return homPrep.(F)
 end
 
-function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
-    @req coefficient_ring(I) == domain(nu) "coefficient ring of input ideal must match tropical semiring map domain"
-    @req domain(nu)(uniformizer(nu)) == gen(domain(nu)) "tropical semiring map must encode t-adic valuation"
-
+function tropical_points_tadic_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
     # check that generators are triangular set and prep for root tree
     triangularSet = gens(I)
     @req is_lower_triangular(triangularSet) "Generators of input ideal must be lower triangular."
@@ -70,31 +67,19 @@ function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal{<:Gener
 
     # initialize root tree
     Gamma = root_tree(triangularSet, QQ(precision), QQ(precisionStep))
-    if get_verbosity_level(:ZerodimensionalTropicalization) > 0
-        println("Starting root tree:")
-        println(Gamma)
-    end
+    @vprintln :ZerodimensionalTropicalization "Starting root tree:\n$(Gamma)"
 
     # grow root tree
-    while true
-        leaf = pick_ungrown_leaf(Gamma) 
-        if leaf<0
-            break
+    leafToGrow = 1
+    while leafToGrow>0
+        growthSuccessful = grow!(Gamma,leafToGrow)
+        if !growthSuccessful
+            reinforce!(Gamma,leafToGrow)
         end
-        extendSuccessful = grow!(Gamma,leaf) 
-        if !extendSuccessful
-            reinforce!(Gamma,leaf)
-        end
-        if get_verbosity_level(:ZerodimensionalTropicalization) > 0
-            println("Updated root tree:")
-            println(Gamma)
-        end
+        @vprintln :ZerodimensionalTropicalization "Updated root tree:\n$(Gamma)"
+        leafToGrow = pick_ungrown_leaf(Gamma)
     end
 
     # extract and return tropical points
-    TropI = tropical_points(Gamma)
-    if convention(nu) == max
-        TropI = -TropI
-    end
-    return TropI
+    return convention(nu)==min ? tropical_points(Gamma) : -tropical_points(Gamma)
 end
