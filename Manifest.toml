@@ -54,9 +54,9 @@ version = "1.0.9+0"
 
 [[deps.CodeTracking]]
 deps = ["InteractiveUtils", "UUIDs"]
-git-tree-sha1 = "980f01d6d3283b3dbdfd7ed89405f96b7256ad57"
+git-tree-sha1 = "9ce926a33a8608421a4d45c012884165b3fcd3ee"
 uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
-version = "2.0.1"
+version = "2.0.2"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -335,9 +335,9 @@ version = "6.3.0+2"
 
 [[deps.Hecke]]
 deps = ["AbstractAlgebra", "Artifacts", "Dates", "Distributed", "FLINT_jll", "LinearAlgebra", "Nemo", "Pkg", "Printf", "Random", "RandomExtensions", "SparseArrays"]
-git-tree-sha1 = "ebd7f767038ec3daeeac4a1b33f6002569d2a5d4"
+git-tree-sha1 = "1adda583a4524e513c3e7f3f6e5b49efc94dc176"
 uuid = "3e1990a7-5d81-5526-99ce-9ba3ff248f21"
-version = "0.39.0"
+version = "0.39.1"
 weakdeps = ["GAP", "Polymake"]
 
     [deps.Hecke.extensions]
@@ -374,9 +374,9 @@ version = "1.7.1"
 
 [[deps.JSON]]
 deps = ["Dates", "Logging", "Parsers", "PrecompileTools", "StructUtils", "UUIDs", "Unicode"]
-git-tree-sha1 = "eb04df293213df64ddd720c86de3c431f5f8ccf1"
+git-tree-sha1 = "5b6bb73f555bc753a6153deec3717b8904f5551c"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-version = "1.2.1"
+version = "1.3.0"
 
     [deps.JSON.extensions]
     JSONArrowExt = ["ArrowTypes"]
@@ -398,9 +398,9 @@ version = "1.14.3"
 
 [[deps.JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "277779adfedf4a30d66b64edc75dc6bb6d52a16e"
+git-tree-sha1 = "b6c76964c65ebf8309460fb8f0f437b4a59d809b"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.10.6"
+version = "0.10.7"
 
 [[deps.JuliaSyntaxHighlighting]]
 deps = ["StyledStrings"]
@@ -599,7 +599,7 @@ version = "1.8.1"
 
 [[deps.Oscar]]
 deps = ["AbstractAlgebra", "AlgebraicSolving", "Compat", "Distributed", "GAP", "Hecke", "JSON", "JSON3", "LazyArtifacts", "Markdown", "Mongoc", "Nemo", "NetworkOptions", "Pkg", "Polymake", "ProgressMeter", "Random", "RandomExtensions", "Serialization", "Singular", "TOPCOM_jll", "UUIDs", "cohomCalg_jll", "f4ncgb_jll", "lib4ti2_jll"]
-git-tree-sha1 = "f94d326840e2b0a72bdc5169fe74585625ada766"
+git-tree-sha1 = "cbe384d4b7817e04af7d93cfb1ad30c06f819eee"
 repo-rev = "master"
 repo-url = "https://github.com/oscar-system/Oscar.jl.git"
 uuid = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
@@ -607,7 +607,7 @@ version = "1.6.0-DEV"
 
 [[deps.OscarPuiseuxPolynomial]]
 deps = ["Oscar"]
-git-tree-sha1 = "943e3bd90aa270a3b6b8ee273d6b3eb0f6c62fd9"
+git-tree-sha1 = "00cc62f7494439cca94aa27e588cb4c347ace8fd"
 repo-rev = "main"
 repo-url = "https://github.com/ollieclarke8787/OscarPuiseuxPolynomials"
 uuid = "7e8d91a7-ef99-4171-8ecc-0b23a9b9da6d"
@@ -648,9 +648,9 @@ weakdeps = ["REPL"]
 
 [[deps.Polymake]]
 deps = ["AbstractAlgebra", "BinaryWrappers", "CxxWrap", "FileWatching", "JSON", "Mongoc", "NetworkOptions", "Ninja_jll", "Perl_jll", "Pkg", "REPL", "Scratch", "SparseArrays", "TOPCOM_jll", "lib4ti2_jll", "libpolymake_julia_jll", "polymake_jll", "polymake_oscarnumber_jll"]
-git-tree-sha1 = "78d8a3098922197f065a48aa490a43361f5098b1"
+git-tree-sha1 = "172b68ef971cfb6cc750cbf045e0c03abf9727b8"
 uuid = "d720cf60-89b5-51f5-aff5-213f193123e7"
-version = "0.13.3"
+version = "0.13.4"
 
     [deps.Polymake.extensions]
     GraphvizExt = "Graphviz_jll"
@@ -711,9 +711,9 @@ version = "1.3.1"
 
 [[deps.Revise]]
 deps = ["CodeTracking", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "REPL", "Requires", "UUIDs", "Unicode"]
-git-tree-sha1 = "b7e5b731326a99431517b0b4c1f3902e842103a2"
+git-tree-sha1 = "85d94c2be31f58728cd69d13f2e0bdd7ecf6dfe9"
 uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
-version = "3.12.0"
+version = "3.12.1"
 weakdeps = ["Distributed"]
 
     [deps.Revise.extensions]
@@ -721,9 +721,9 @@ weakdeps = ["Distributed"]
 
 [[deps.SCIP_jll]]
 deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "GMP_jll", "Ipopt_jll", "JLLWrappers", "Libdl", "Readline_jll", "Zlib_jll", "boost_jll"]
-git-tree-sha1 = "5630263485408eb84380cd9126e8d76159f08c66"
+git-tree-sha1 = "658d911948de4ff88fe2b61823bdd1e1add98a7d"
 uuid = "e5ac4fe4-a920-5659-9bf8-f9f73e9e79ce"
-version = "900.200.200+0"
+version = "900.200.400+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -923,15 +923,15 @@ version = "5.15.0+0"
 
 [[deps.libcxxwrap_julia_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "8b2fd0fe34d810c17fd18fedc028f36875411959"
+git-tree-sha1 = "78152ea4704e57978352c340020c5b0107d03734"
 uuid = "3eaa8342-bff7-56a5-9981-c04077f7cee7"
-version = "0.14.5+0"
+version = "0.14.7+0"
 
 [[deps.libpolymake_julia_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "FLINT_jll", "JLLWrappers", "Libdl", "TOPCOM_jll", "lib4ti2_jll", "libcxxwrap_julia_jll", "polymake_jll"]
-git-tree-sha1 = "3994d78f66ac8c71b58eb7f48584f8d4822d3387"
+git-tree-sha1 = "dce1dfd4fa5282f0c0d2e003cbcc45c61504bc0f"
 uuid = "4d8266f6-2b3b-57e3-ad7a-d431eaaac945"
-version = "0.14.3+0"
+version = "0.14.3+1"
 
 [[deps.libsingular_julia_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Singular_jll", "libcxxwrap_julia_jll"]
@@ -987,9 +987,9 @@ version = "400.1500.0+0"
 
 [[deps.polymake_oscarnumber_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl", "libcxxwrap_julia_jll", "libpolymake_julia_jll", "polymake_jll"]
-git-tree-sha1 = "54e9e9555bab82c8c9d268805f3b144db9cfd575"
+git-tree-sha1 = "628a1afaec0a254877e097121d5c2ce70ef0fe02"
 uuid = "10f31823-b687-53e6-9f29-edb9d4da9f9f"
-version = "0.3.12+0"
+version = "0.3.12+1"
 
 [[deps.snappy_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

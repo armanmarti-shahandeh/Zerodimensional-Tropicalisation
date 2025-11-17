@@ -56,7 +56,7 @@ function tropical_variety_zerodimensional_tadic_triangular(I::MPolyIdeal, ::Trop
         if leaf<0
             break
         end
-        extendSuccessful = extend!(Gamma,leaf) # try extending the leaf
+        extendSuccessful = grow!(Gamma,leaf) # try extending the leaf
         if !extendSuccessful
             reinforce!(Gamma,leaf) # try reinforcing the leaf
         end

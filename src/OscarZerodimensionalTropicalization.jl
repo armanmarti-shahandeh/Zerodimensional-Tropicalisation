@@ -4,12 +4,12 @@ using OscarPuiseuxPolynomial
 using Oscar
 
 function __init__()
-    # for tropical_variety_zerodimensional_tadic_triangular
     add_verbosity_scope(:ZerodimensionalTropicalization)
     add_assertion_scope(:ZerodimensionalTropicalization)
-    # for puiseux_expansion
+    add_verbosity_scope(:ImproveRoot)
+    add_assertion_scope(:ImproveRoot)
     add_verbosity_scope(:PuiseuxExpansion)
-    add_assertion_scope(:PuiseuxExpansionb)
+    add_assertion_scope(:PuiseuxExpansion)
 end
 
 include("imports.jl")

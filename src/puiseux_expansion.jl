@@ -98,7 +98,7 @@ end
 
 
 @doc raw"""
-    convert_for_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
+    convert_for_roots_in_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
 
 Convert polynomial `h` in $K[x_i]\subseteq K{{t}}[u_1,\dots,u_n][x_1,\dots,x_n]$
 to a polynomial in $K[x_i]$.
@@ -121,7 +121,7 @@ julia> h = initial_zero(f1Tilde)
 julia> typeof(h)
 AbstractAlgebra.Generic.MPoly{AbstractAlgebra.Generic.MPoly{OscarPuiseuxPolynomial.MPuiseuxPolyRingElem{QQBarFieldElem}}}
 
-julia> h = OscarZerodimensionalTropicalization.convert_for_puiseux_expansion(h)
+julia> h = OscarZerodimensionalTropicalization.convert_for_roots_in_puiseux_expansion(h)
 {a1: 2.00000}*x1^2 + {a1: 2.00000}*x1
 
 julia> typeof(h)
@@ -129,7 +129,7 @@ AbstractAlgebra.Generic.Poly{QQBarFieldElem}
 
 ```
 """
-function convert_for_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
+function convert_for_roots_in_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
     Ktux = parent(h)
     K = base_ring(base_ring(base_ring(Ktux)))
     i = findfirst(!iszero, first(exponents(h)))
@@ -146,10 +146,7 @@ function convert_for_puiseux_expansion(h::MPolyRingElem{<:MPolyRingElem})
 end
 
 
-# Input:
-#   - 
-# Return:
-#   - 
+
 function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem}, w::QQFieldElem, precMax::QQFieldElem)
     @req length(fiTilde)>1 "polynomial must not be monomial"
     
@@ -172,16 +169,18 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem}, w::QQFieldEl
         return [ui*t^w]
     end
 
-    return h
+    h = convert_for_roots_in_puiseux_expansion(h)
 
-    h = root_calculation_conversion(h)
-    newRoots = Vector{AbstractAlgebra.Generic.MPoly{<:AbstractAlgebra.Generic.PuiseuxSeriesFieldElem}}()
+    newRoots = elem_type(Ktu)[]
     for c in roots(h)
         if iszero(c)   
             continue
         end
-        g = evaluate(f, vcat(zeros(Ktux, activeVariableIndex-1), xi+c*t^w, zeros(Ktux, ngens(Ktux)-activeVariableIndex)))
-        canComputeNextValuation, sigma = is_extended_newton_polyhedron_well_defined_with_polyhedron(g)
+        if get_verbosity_level(:PuiseuxExpansion) > 0
+            println("Found root c=", c, " at exponent w=", w)
+        end
+        g = evaluate(fiTilde, vcat(zeros(Ktux, i-1), xi+Ktux(c)*t^w, zeros(Ktux, ngens(Ktux)-i)))
+        canComputeNextValuation, sigma = is_newton_polygon_well_defined_with_polygon(g)
         if !canComputeNextValuation  # This is the case where we have u_i's present in our Newton polygon vertices, so we cannot compute the valuation of the next term of our root
             if !(ui*t^w in newRoots)
                 push!(newRoots, ui*t^w)
@@ -189,13 +188,13 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem}, w::QQFieldEl
             continue
         end
         nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
-        #=     if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
-        push!(newRoots, Su(c*t^w))
-        continue
-        end=#
+        # if isempty(nextExponents) # This is the case where the root is fully computed, so no valid next exponents.
+        #     push!(newRoots, Su(c*t^w))
+        #     continue
+        # end
         for nextExponent in nextExponents
-            for tailTerm in local_field_expansion(g,nextExponent,precMax)
-                push!(newRoots, c*t^w + tailTerm)
+            for tailTerm in puiseux_expansion(g,nextExponent,precMax)
+                push!(newRoots, Kt(c)*t^w + tailTerm)
             end
         end
         if iszero(evaluate(g, zeros(Ktux, ngens(Ktux)))) # This is the case where we have computed a finite root in entirety.
