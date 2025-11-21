@@ -12,9 +12,9 @@ using Oscar
 
         # checking pathological cases
         I = ideal([zero(Kx)])
-        @test_throws tropical_points_tadic_triangular(I, nu)
+        @test_throws Exception tropical_points_tadic_triangular(I, nu)
         I = ideal([Kx(t)])
-        @test_throws tropical_points_tadic_triangular(I, nu)
+        @test_throws Exception tropical_points_tadic_triangular(I, nu)
 
         # checking case with unique Newton polygons
         f1 = (x1+t^3)*(x1+1+t^4)
