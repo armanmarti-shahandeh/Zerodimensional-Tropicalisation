@@ -180,6 +180,14 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
         @vprintln :PuiseuxExpansion "Found root c=$(c) at exponent w=$(w)"
 
         g = evaluate(fiTilde, vcat(zeros(Ktux, i-1), xi+Ktux(c)*t^w, zeros(Ktux, ngens(Ktux)-i)))
+
+        # check whether next term exists or whether root is completely computed
+        if iszero(evaluate(g, zeros(Ktux, ngens(Ktux))))
+            push!(newRoots, Ktu(Kt(c)*t^w))
+            continue
+        end
+
+        # compute the next term
         canComputeNextTerm, sigma = is_newton_polygon_well_defined_with_polygon(g)
         if !canComputeNextTerm
             return [ui*t^w]
@@ -189,9 +197,6 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
             for tailTerm in puiseux_expansion(g,nextExponent,relPrecMax - (w-nextExponent))
                 push!(newRoots, Kt(c)*t^w + tailTerm)
             end
-        end
-        if iszero(evaluate(g, zeros(Ktux, ngens(Ktux)))) # This is the case where we have computed a finite root in entirety.
-            push!(newRoots, Ktu(Kt(c)*t^w))
         end
     end
     return newRoots
