@@ -40,7 +40,7 @@ jobs:
         run: |
           julia -e '
             using Pkg;
-            Pkg.add(name="Oscar", url="https://github.com/oscar-system/Oscar.jl", rev="master");
+            Pkg.add(url="https://github.com/oscar-system/Oscar.jl", rev="master");
             Pkg.add(url="https://github.com/ollieclarke8787/OscarPuiseuxPolynomials", rev="main");
             Pkg.resolve();
           '
