@@ -36,6 +36,14 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+      - name: Install dev dependencies
+        run: |
+          julia -e '
+            using Pkg;
+            Pkg.add(name="Oscar", url="https://github.com/oscar-system/Oscar.jl", rev="master");
+            Pkg.add(name="OscarPuiseuxPolynomials", url="https://github.com/ollieclarke8787/OscarPuiseuxPolynomials", rev="main");
+            Pkg.resolve();
+          '
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
