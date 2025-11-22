@@ -324,9 +324,9 @@ version = "6.3.0+2"
 
 [[deps.Hecke]]
 deps = ["AbstractAlgebra", "Artifacts", "Dates", "Distributed", "FLINT_jll", "LinearAlgebra", "Nemo", "Pkg", "Printf", "Random", "RandomExtensions", "SparseArrays"]
-git-tree-sha1 = "7d5ae8684081c39ca3420bed755f22d048c7c277"
+git-tree-sha1 = "744a8e4f7c2d812979eb9c2463e2dbbd894659cf"
 uuid = "3e1990a7-5d81-5526-99ce-9ba3ff248f21"
-version = "0.39.2"
+version = "0.39.3"
 weakdeps = ["GAP", "Polymake"]
 
     [deps.Hecke.extensions]
@@ -571,7 +571,7 @@ version = "0.5.6+0"
 
 [[deps.Oscar]]
 deps = ["AbstractAlgebra", "AlgebraicSolving", "Compat", "Distributed", "GAP", "Hecke", "JSON", "JSON3", "LazyArtifacts", "Markdown", "Mongoc", "Nemo", "NetworkOptions", "Pkg", "Polymake", "ProgressMeter", "Random", "RandomExtensions", "Serialization", "Singular", "TOPCOM_jll", "UUIDs", "cohomCalg_jll", "f4ncgb_jll", "lib4ti2_jll"]
-git-tree-sha1 = "1156e6fd00a66e8261a6fbbcca2c1b0b76a6bf9a"
+git-tree-sha1 = "67ea9359e08e943a582c417691d44c99b09d2aa2"
 repo-rev = "master"
 repo-url = "https://github.com/oscar-system/Oscar.jl.git"
 uuid = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
