@@ -5,7 +5,7 @@ authors = ["Yue Ren <yue.ren.kl@gmail.com>"]
 
 [deps]
 Oscar = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
-OscarPuiseuxPolynomial = "7e8d91a7-ef99-4171-8ecc-0b23a9b9da6d"
+OscarPuiseuxPolynomials = "7e8d91a7-ef99-4171-8ecc-0b23a9b9da6d"
 
 [compat]
 Oscar = "1.6.0"
