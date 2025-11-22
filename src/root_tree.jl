@@ -256,7 +256,9 @@ if it is at depth 2.  Otherwise set it to the precision of its parent.
 function increase_precision!(Gamma::RootTree, vertex::Int)
     if depth(Gamma, vertex) == 2
         Gamma.precs[vertex] += precStep(Gamma)
-        @req Gamma.precs[vertex] <= precMax(Gamma) "Precision exceeds maximum precision."
+        if (prec(Gamma,vertex) > precMax(Gamma))
+            Gamma.precMax = prec(Gamma,vertex)
+        end
     else
        Gamma.precs[vertex] = prec(Gamma, branch(Gamma, vertex)[2])
     end
