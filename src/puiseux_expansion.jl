@@ -147,7 +147,7 @@ end
 
 
 
-function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}}, w::QQFieldElem, precMax::QQFieldElem)
+function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}}, w::QQFieldElem, relPrecMax::QQFieldElem)
     @req length(fiTilde)>1 "polynomial must not be monomial"
     
     Ktux = parent(fiTilde)
@@ -160,7 +160,7 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
     ui = gens(Ktu)[i]
     t = first(gens(Kt))
 
-    if w >= precMax # maximum precision reached
+    if relPrecMax < 0 # maximum precision reached
         return [ui*t^w]
     end
 
@@ -186,7 +186,7 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
         end
         nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
         for nextExponent in nextExponents
-            for tailTerm in puiseux_expansion(g,nextExponent,precMax)
+            for tailTerm in puiseux_expansion(g,nextExponent,relPrecMax - (w-nextExponent))
                 push!(newRoots, Kt(c)*t^w + tailTerm)
             end
         end
