@@ -191,7 +191,7 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
             end
         end
         if iszero(evaluate(g, zeros(Ktux, ngens(Ktux)))) # This is the case where we have computed a finite root in entirety.
-            push!(newRoots, Kt(c)*t^w)
+            push!(newRoots, Ktu(Kt(c)*t^w))
         end
     end
     return newRoots
