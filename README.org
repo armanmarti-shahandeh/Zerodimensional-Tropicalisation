@@ -1,0 +1,37 @@
+#+title: OscarZerodimensionalTropicalization.jl
+
+* Introduction
+~OscarZerodimensionalTropicalization.jl~ is a package for computing tropicalization of zero-dimensional ideals over rational function fields $\mathbb{Q}(\!(t)\!)$ and $\mathbb{F}_p(\!(t)\!)$ in [[https://www.oscar-system.org/][OSCAR]] via triangular decomposition and backsubstitution as initial described in
+
+#+BEGIN_QUOTE
+Hofmann, Ren: "Computing Tropical Points and Tropical Links". Discrete Comput Geom 60, 627–645 (2018). [[https://doi.org/10.1007/s00454-018-0023-z][doi:10.1007/s00454-018-0023-z]].
+#+END_QUOTE
+
+Implementation details for this package can be found in:
+
+#+BEGIN_QUOTE
+Marti-Shahandeh, Ren, Schleis: "Computing Zerodimensional Tropicalization in OSCAR". to appear.
+#+END_QUOTE
+
+In contrast to previous implementations, our implementation uses adaptive root-wise precision.  This means that there are no errors due to insufficient precision and that each root is computed to the minimal necessary precision.
+
+* Installation
+
+This package will eventually become part of OSCAR.  Until then, you can install it manually together with its two dependencies as follows:
+
+#+begin_src julia
+  using Pkg
+  Pkg.add(url="https://github.com/oscar-system/Oscar.jl", rev="master")
+  Pkg.add(url="https://github.com/ollieclarke8787/OscarPuiseuxPolynomials", rev="main")
+  Pkg.add(url="https://github.com/armanmarti-shahandeh/Zerodimensional-Tropicalisation", rev="main")
+#+end_src
+
+or using the Pkg REPL (press ~]~ to enter):
+
+#+begin_src julia
+  add https://github.com/oscar-system/Oscar.jl#master
+  add https://github.com/ollieclarke8787/OscarPuiseuxPolynomials#main
+  add https://github.com/armanmarti-shahandeh/Zerodimensional-Tropicalisation#main
+#+end_src
+
+* Usage
