@@ -555,6 +555,7 @@ end
 function improve_root!(Gamma::RootTree, vertex::Int)
     rootToImprove = root(Gamma, vertex)
     rootBranch = branch(Gamma, vertex)
+    rootValuation = root_valuation(Gamma, vertex)
 
     Ku = parent(rootToImprove)
     certainApproximation = certain_approximation(Gamma, vertex) # known terms of the root
@@ -562,7 +563,7 @@ function improve_root!(Gamma::RootTree, vertex::Int)
     prepPoly = reinforcement_polynomial(Gamma, vertex)          # polynomial for the unkown terms
     precStop = depth(Gamma, vertex)==2 ? prec(Gamma, vertex) : precMax(Gamma) # Use `prec(Gamma, vertex)` for z1, use `precMax(Gamma)` for all other zi.
 
-    improvedRoots = puiseux_expansion(prepPoly, tailValuation, precStop) # compute unkown terms
+    improvedRoots = puiseux_expansion(prepPoly, tailValuation, precStop - (tailValuation - rootValuation)) # compute unkown terms
 
     Gamma.roots[vertex] = certainApproximation + Ku(improvedRoots[1]) # use existing vertex to store first solution in the original vertex
     if length(improvedRoots)>1                                        # create new branches to store additional solutions
