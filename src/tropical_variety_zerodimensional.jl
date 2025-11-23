@@ -1,10 +1,10 @@
-function tropical_variety_zerodimensional_tadic(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32)
+function tropical_variety_zerodimensional(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32)
     @req coefficient_ring(I) == domain(nu) "coefficient ring of input ideal must match tropical semiring map domain"
     @req domain(nu)(uniformizer(nu)) == gen(domain(nu)) "tropical semiring map must encode t-adic valuation"
 
     Sigma = Vector{QQFieldElem}[]
     for F in triangular_decomposition(I; algorithm=:lazard_factorized, ord=gens(base_ring(I)))
-        Sigma = vcat(Sigma, tropical_points_tadic_triangular(F, nu; precision=precision))
+        Sigma = vcat(Sigma, tropical_points_triangular(F, nu; precision=precision))
     end
     Sigma = unique(sort(Sigma))
     TropI = tropical_variety(polyhedral_complex(incidence_matrix([[i] for i in 1:length(Sigma)]),Sigma),
@@ -47,7 +47,7 @@ function rational_function_to_puiseux_polynomial(c::Generic.RationalFunctionFiel
     return d
 end
 
-function prep_for_tropical_variety_zerodimensional_tadic_triangular(F::Vector{<:MPolyRingElem})
+function prep_for_tropical_points_triangular(F::Vector{<:MPolyRingElem})
     F = [ f*lcm(denominator.(coefficients(f))) for f in F ] # clear denominators
 
     Ktx = parent(F[1])
@@ -59,11 +59,11 @@ function prep_for_tropical_variety_zerodimensional_tadic_triangular(F::Vector{<:
     return homPrep.(F)
 end
 
-function tropical_points_tadic_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
+function tropical_points_triangular(I::MPolyIdeal{<:Generic.MPoly{<:Generic.RationalFunctionFieldElem}}, nu::TropicalSemiringMap; precision::Int=32, precisionStep::Int=4)
     # check that generators are triangular set and prep for root tree
     triangularSet = gens(I)
     @req is_lower_triangular(triangularSet) "Generators of input ideal must be lower triangular."
-    triangularSet = prep_for_tropical_variety_zerodimensional_tadic_triangular(triangularSet)
+    triangularSet = prep_for_tropical_points_triangular(triangularSet)
 
     # initialize root tree
     Gamma = root_tree(triangularSet, QQ(precision), QQ(precisionStep))
