@@ -23,4 +23,4 @@ I = ideal(G);
 
 FF = triangular_decomposition(I; algorithm=:lazard_factorized, ord=gens(base_ring(I)));
 I = first(FF)
-TropI = tropical_points_tadic_triangular(I, nu)
+TropI = tropical_points_triangular(I, nu)
