@@ -412,7 +412,7 @@ function Base.show(io::IO, Gamma::RootTree)
     if iszero(n_vertices(tree(Gamma)))
         println(io, "empty root tree")
     else
-        println(io, "root tree of the triangular system")
+        println(io, "root tree of triangular system")
         for f in system(Gamma)
             println(" ",f)
         end
