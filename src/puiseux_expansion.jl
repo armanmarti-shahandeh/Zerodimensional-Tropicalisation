@@ -147,7 +147,7 @@ end
 
 
 
-function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}}, w::QQFieldElem, precMax::QQFieldElem)
+function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPolyRingElem}}, w::QQFieldElem, relPrecMax::QQFieldElem)
     @req length(fiTilde)>1 "polynomial must not be monomial"
     
     Ktux = parent(fiTilde)
@@ -160,7 +160,7 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
     ui = gens(Ktu)[i]
     t = first(gens(Kt))
 
-    if w >= precMax # maximum precision reached
+    if relPrecMax < 0 # maximum precision reached
         return [ui*t^w]
     end
 
@@ -180,18 +180,24 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
         @vprintln :PuiseuxExpansion "Found root c=$(c) at exponent w=$(w)"
 
         g = evaluate(fiTilde, vcat(zeros(Ktux, i-1), xi+Ktux(c)*t^w, zeros(Ktux, ngens(Ktux)-i)))
+
+        # check whether next term exists or whether root is completely computed
+        if iszero(evaluate(g, zeros(Ktux, ngens(Ktux))))
+            push!(newRoots, Ktu(Kt(c)*t^w))
+            continue
+        end
+
+        # compute the next term
         canComputeNextTerm, sigma = is_newton_polygon_well_defined_with_polygon(g)
         if !canComputeNextTerm
             return [ui*t^w]
         end
         nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
         for nextExponent in nextExponents
-            for tailTerm in puiseux_expansion(g,nextExponent,precMax)
+            @vprintln :PuiseuxExpansion "  Enter recursion for exponent $(nextExponent) and precision $(relPrecMax - (w - nextExponent))"
+            for tailTerm in puiseux_expansion(g,nextExponent,relPrecMax - (nextExponent-w))
                 push!(newRoots, Kt(c)*t^w + tailTerm)
             end
-        end
-        if iszero(evaluate(g, zeros(Ktux, ngens(Ktux)))) # This is the case where we have computed a finite root in entirety.
-            push!(newRoots, Su(c*t^w))
         end
     end
     return newRoots
