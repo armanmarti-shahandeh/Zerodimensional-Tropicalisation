@@ -194,7 +194,8 @@ function puiseux_expansion(fiTilde::MPolyRingElem{<:MPolyRingElem{<:MPuiseuxPoly
         end
         nextExponents = [ v[1]/v[2] for v in normal_vector.(facets(sigma)) if v[2]<0 && v[1]/v[2]>w]
         for nextExponent in nextExponents
-            for tailTerm in puiseux_expansion(g,nextExponent,relPrecMax - (w-nextExponent))
+            @vprintln :PuiseuxExpansion "  Enter recursion for exponent $(nextExponent) and precision $(relPrecMax - (w - nextExponent))"
+            for tailTerm in puiseux_expansion(g,nextExponent,relPrecMax - (nextExponent-w))
                 push!(newRoots, Kt(c)*t^w + tailTerm)
             end
         end
