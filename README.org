@@ -1,5 +1,7 @@
 #+title: OscarZerodimensionalTropicalization.jl
 
+[[https://codecov.io/github/yueren/oscarzerodimensionaltropicalization][https://codecov.io/github/yueren/oscarzerodimensionaltropicalization/graph/badge.svg?token=5BG2V4BXMD]]
+
 * Introduction
 ~OscarZerodimensionalTropicalization.jl~ is a package for computing tropicalization of zero-dimensional ideals over rational function fields $\mathbb{Q}(\!(t)\!)$ and $\mathbb{F}_p(\!(t)\!)$ in [[https://www.oscar-system.org/][OSCAR]] via triangular decomposition and backsubstitution as initial described in
 
