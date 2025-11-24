@@ -23,7 +23,7 @@ This package will eventually become part of OSCAR.  Until then, you can install 
   using Pkg
   Pkg.add(url="https://github.com/oscar-system/Oscar.jl", rev="master")
   Pkg.add(url="https://github.com/ollieclarke8787/OscarPuiseuxPolynomials", rev="main")
-  Pkg.add(url="https://github.com/armanmarti-shahandeh/Zerodimensional-Tropicalisation", rev="main")
+  Pkg.add(url="https://github.com/YueRen/OscarZerodimensionalTropicalization", rev="main")
 #+end_src
 
 or using the Pkg REPL (press ~]~ to enter):
@@ -31,7 +31,7 @@ or using the Pkg REPL (press ~]~ to enter):
 #+begin_src julia
   add https://github.com/oscar-system/Oscar.jl#master
   add https://github.com/ollieclarke8787/OscarPuiseuxPolynomials#main
-  add https://github.com/armanmarti-shahandeh/Zerodimensional-Tropicalisation#main
+  add https://github.com/YueRen/OscarZerodimensionalTropicalization#main
 #+end_src
 
 * Usage
@@ -42,6 +42,10 @@ The two main commands provided by this package are:
 - ~tropical_variety_zerodimensional~: takes an ideal that is zero-dimensional, computes a triangular decomposition, repeatedly calls ~tropical_points_triangular~, and collects all points in a single ~TropicalVariety~.
 
 #+begin_src julia
+julia> using OscarZerodimensionalTropicalization
+
+julia> using Oscar
+
 julia> K,t = rational_function_field(GF(3),:t);
 
 julia> nu = tropical_semiring_map(K,t)
